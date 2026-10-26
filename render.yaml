@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: rasd-audit
+    runtime: node
+    plan: free
+    buildCommand: npm install --legacy-peer-deps && NITRO_PRESET=node-server npx vite build
+    startCommand: node start.mjs
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
