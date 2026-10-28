@@ -42,7 +42,7 @@ import {
 import { AuditReport } from "./AuditReport";
 import { ObservationsPanel } from "./ObservationsPanel";
 import { ExecutiveDashboard } from "./dashboard";
-import { RejectedAlert, CalibrationPanel, LettersPanel } from "./panels";
+import { RejectedAlert, CalibrationPanel } from "./panels";
 const import_papaparse = { default: Papa };
 function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -5936,13 +5936,7 @@ function SectorAudit({ auditTab }) {
           setDeletedObs(new Set());
         },
       }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LettersPanel, {
-        observations,
-        findings,
-        sectors: auditSectors,
-        datasetLabel,
-        Button,
-      }),
+    
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CalibrationPanel, {
         calibration,
         setCalibration,
