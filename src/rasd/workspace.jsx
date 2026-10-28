@@ -23,6 +23,14 @@ import { quantileSorted } from "simple-statistics";
 import radarImg from "@/assets/radar-sculpture.jpg";
 import { extractPdfRows } from "./pdf-rows";
 import { mapWorkbook, rowsFromAoa } from "./import-table";
+import { parseDateMs } from "./dates";
+import {
+  listRegulations,
+  saveRegulation,
+  deleteRegulation,
+} from "./regulations-db";
+import { extractPdfText } from "./pdf-text";
+import BackupPanel from "./BackupPanel";
 import { AdvancedPanel, sodFindings, fraudFindings, complianceOf, valueKeyOf } from "./advanced";
 import { advancedFindings } from "./advanced-queries";
 import { legalFrameworkOf, legalTextOf } from "./legal-framework";
@@ -2028,10 +2036,7 @@ var n = (v) => {
   );
   return String(v ?? "").trim() === "" || !Number.isFinite(x) ? void 0 : x;
 };
-var d = (v) => {
-  const t = Date.parse(String(v ?? ""));
-  return Number.isNaN(t) ? void 0 : t;
-};
+var d = (v) => parseDateMs(v);
 var empty = (v) => !String(v ?? "").trim();
 var yes = (v) =>
   /^(نعم|yes|y|true|1|نعم يوجد|يوجد|متجاوز|تجاوز)$/i.test(
@@ -4071,40 +4076,6 @@ var riskLevel = (fs) =>
       : fs.length
         ? "low"
         : "none";
-var DB = "rasd-audit-library";
-function db() {
-  return new Promise((res, rej) => {
-    const r = indexedDB.open(DB, 1);
-    r.onupgradeneeded = () =>
-      r.result.createObjectStore("regulations", { keyPath: "id" });
-    r.onsuccess = () => res(r.result);
-    r.onerror = () => rej(r.error);
-  });
-}
-async function tx(mode, fn) {
-  const d = await db();
-  return new Promise((res, rej) => {
-    const r = fn(d.transaction("regulations", mode).objectStore("regulations"));
-    r.onsuccess = () => res(r.result);
-    r.onerror = () => rej(r.error);
-  });
-}
-var listRegulations = () => tx("readonly", (s) => s.getAll());
-var saveRegulation = (d) => tx("readwrite", (s) => s.put(d));
-var deleteRegulation = (id) => tx("readwrite", (s) => s.delete(id));
-async function extractPdfText(file) {
-  const pdfjs = await import("pdfjs-dist");
-  const worker = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
-  pdfjs.GlobalWorkerOptions.workerSrc = worker;
-  const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() })
-    .promise;
-  const pages = [];
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const c = await (await pdf.getPage(i)).getTextContent();
-    pages.push(c.items.map((it) => ("str" in it ? it.str : "")).join(" "));
-  }
-  return pages.join("\n");
-}
 var REPORTS = "rasd-audit-reports";
 function loadReports() {
   try {
@@ -4115,7 +4086,11 @@ function loadReports() {
   }
 }
 function storeReports(r) {
-  localStorage.setItem(REPORTS, JSON.stringify(r));
+  try {
+    localStorage.setItem(REPORTS, JSON.stringify(r));
+  } catch {
+    /* storage full: the user is warned by the backup panel */
+  }
 }
 var findingKey = (dataset, test, ref) =>
   `${dataset}|${test.trim()}|${ref.trim()}`;
@@ -4519,7 +4494,14 @@ function SectorAudit({ auditTab }) {
     setLoaded(true);
   }, []);
   (0, import_react.useEffect)(() => {
-    if (loaded) localStorage.setItem("rasd-audit-store", JSON.stringify(store));
+    if (!loaded) return;
+    try {
+      localStorage.setItem("rasd-audit-store", JSON.stringify(store));
+    } catch {
+      setAlertMsg(
+        "تعذر حفظ البيانات في المتصفح (امتلأت المساحة). نزّل نسخة احتياطية من تبويب «التقارير السابقة» الآن.",
+      );
+    }
   }, [store, loaded]);
   (0, import_react.useEffect)(() => {
     if (loaded)
@@ -4855,7 +4837,7 @@ function SectorAudit({ auditTab }) {
         setImportMsg(`تم استيراد ${r.rows.length} سجل إلى «${ds.label}»`);
         return;
       } else if (/\.pdf$/i.test(file.name)) {
-        data = await extractPdfRows(file, ds.fields);
+        data = await extractPdfRows(file, ds.fields, setImportMsg);
       } else throw Error("صيغة غير مدعومة. استخدم Excel أو CSV أو PDF");
       const valid = data
         .map((r) =>
@@ -4884,7 +4866,7 @@ function SectorAudit({ auditTab }) {
     try {
       for (const file of Array.from(files)) {
         if (!/\.pdf$/i.test(file.name)) continue;
-        const text = await extractPdfText(file);
+        const text = await extractPdfText(file, { onStatus: setMsg });
         await saveRegulation({
           id: crypto.randomUUID(),
           name: file.name.replace(/\.pdf$/i, ""),
@@ -4894,7 +4876,7 @@ function SectorAudit({ auditTab }) {
         });
         if (!text.trim())
           setMsg(
-            `تم حفظ ${file.name} لكن لا يحتوي نصًا قابلًا للقراءة (ربما ممسوح ضوئيًا)`,
+            `تم حفظ ${file.name} لكن لم يُستخرج منه نص حتى بعد OCR (تحقق من جودة المسح أو من الاتصال بالإنترنت)`,
           );
       }
       setDocs(await listRegulations());
@@ -5524,6 +5506,7 @@ function SectorAudit({ auditTab }) {
                 children:
                   "الملاحظة المتكررة لنفس السجل ترفع مستوى المخاطر درجة واحدة.",
               }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BackupPanel, {}),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
                 className: "mt-3 space-y-2 text-xs",
                 children: reports.length

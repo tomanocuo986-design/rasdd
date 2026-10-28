@@ -8,12 +8,12 @@ const fuel = allDatasets.find((d) => d.key === "Fleet_Fuel_System_Logs")!;
 
 function book() {
   const wb = X.utils.book_new();
-  // title rows above the table, sloppy header spelling, Arabic digits, real Excel date
+  // title rows above the table, sloppy header spelling, Arabic digits, Excel date serials (a JS Date cell would depend on the machine time zone)
   const a = X.utils.aoa_to_sheet([
     ["تقرير أوامر الحركة 2025"],
     [],
     ["رقم امر الحركة", " تاريخ الخروج ", "اسم السائق", "رقم الالية", "خط سير الرحلة", "الغرض الرسمي"],
-    ["١٠١", new Date(Date.UTC(2025, 0, 5)), "أحمد", "٤٥٦٧", "عمان - اربد", "مهمة"],
+    ["١٠١", 45662, "أحمد", "٤٥٦٧", "عمان - اربد", "مهمة"],
     ["102", 45667, "خالد", "4568", "عمان - الزرقاء", "مهمة"],
   ]);
   a["B4"].z = "dd/mm/yyyy";

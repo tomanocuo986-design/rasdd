@@ -4,6 +4,8 @@
 // - every sheet is mapped to a dataset: by sheet name first, then by best header overlap
 // - dates become yyyy-mm-dd, numbers lose thousands separators, Arabic digits become Latin
 
+import { isExcelSerial, serialToISO } from "./dates.js";
+
 const AR_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 const FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 
@@ -77,6 +79,10 @@ export function detectHeader(aoa, fields, scan = 40) {
 
 function cleanValue(v, field) {
   let s = latinDigits(String(v ?? "")).replace(/[\u200B-\u200F\u202A-\u202E\uFEFF]/g, "").trim();
+  // Real Excel dates in a "General"-formatted cell arrive as serial numbers (e.g. 46315).
+  if (field.type === "date" && isExcelSerial(s)) {
+    s = serialToISO(parseFloat(s)) || s;
+  }
   if (field.type === "number" && s) {
     s = s.replace(/[٬,\s]/g, "").replace(/٫/g, ".").replace(/%$/, "");
   }

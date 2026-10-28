@@ -8,6 +8,8 @@
  *  - إن رُفع نظام أو تعليمات في «مكتبة الأنظمة» وطابقت المخالفة، فسندها المرفوع (library) له الأولوية على هذا الإطار.
  *  - النسخ الرسمية تتغير بالتعديل؛ عدّل القائمة أدناه (أو أضف صكاً) بما يوافق التشريع النافذ لدى بلديتك.
  */
+import ARTICLES from "./legal-articles.json";
+
 export const INSTRUMENTS = {
   procurement: "نظام المشتريات الحكومية رقم (8) لسنة 2022 وتعليمات تنظيم إجراءات المشتريات الحكومية لسنة 2022",
   municipalLaw: "قانون البلديات رقم (41) لسنة 2015 وتعديلاته",
@@ -59,13 +61,16 @@ export function legalFrameworkOf(finding) {
   const rule = RULES.find((r) => matchesRule(r, test, dataset));
   if (!rule) return undefined;
   const instruments = rule.instruments.map((k) => INSTRUMENTS[k]);
+  // أرقام المواد تُقرأ من legal-articles.json (تُعبّأ بعد مراجعة قانونية). الفارغ => يحتاج تحقق.
+  const articles = String(ARTICLES?.rules?.[rule.id]?.articles ?? "").trim();
+  const verified = Boolean(articles) && Boolean(String(ARTICLES?.verified_by ?? "").trim());
   return {
     ruleId: rule.id,
     instruments,
     note: rule.note,
-    article: "المادة (…) — تُستكمل من النسخة المعتمدة",
-    text: `${instruments.join(" ؛ ")} — ${rule.note}`,
-    needsVerification: true,
+    article: articles || "المادة (…) — تُستكمل من النسخة المعتمدة",
+    text: `${instruments.join(" ؛ ")}${articles ? ` — ${articles}` : ""} — ${rule.note}`,
+    needsVerification: !verified,
   };
 }
 

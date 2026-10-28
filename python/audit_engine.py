@@ -32,6 +32,15 @@ LEGAL = {
 }
 
 
+def legal_article(rule_id: str) -> str:
+    """رقم المادة من src/rasd/legal-articles.json (مشترك مع الواجهة). فارغ => تُستكمل من النسخة المعتمدة."""
+    try:
+        with open(os.path.join(HERE, "..", "src", "rasd", "legal-articles.json"), encoding="utf-8") as fh:
+            return (json.load(fh).get("rules", {}).get(rule_id, {}).get("articles") or "").strip()
+    except (OSError, ValueError):
+        return ""
+
+
 @dataclass
 class Finding:
     dataset: str
@@ -55,6 +64,16 @@ def _num(v):
         return float(s) if s not in ("", "nan", "None") else None
     except ValueError:
         return None
+
+
+def to_date(v):
+    """تحويل تاريخ إلى Timestamp. يدعم الرقم التسلسلي لـ Excel (مثل 46315) إضافة إلى النصوص."""
+    if v is None:
+        return pd.NaT
+    s = str(v).strip()
+    if re.fullmatch(r"\d{5}(\.\d+)?", s) and 20000 <= float(s) <= 80000:
+        return pd.to_datetime(float(s), unit="D", origin="1899-12-30")
+    return pd.to_datetime(v, errors="coerce")
 
 
 def _blank(v) -> bool:
@@ -120,7 +139,7 @@ def run_audit(store: dict[str, pd.DataFrame], params: dict | None = None, today:
                 seen[v] = i
 
     # 3) المشتريات المباشرة: تجزئة/سقف/تركّز/مورد = موظف
-    dp = [(i, r, _num(r.get("value")) or 0.0, pd.to_datetime(r.get("date"), errors="coerce")) for i, r in enumerate(_rows(store, "Direct_Purchases_Orders"))]
+    dp = [(i, r, _num(r.get("value")) or 0.0, to_date(r.get("date"))) for i, r in enumerate(_rows(store, "Direct_Purchases_Orders"))]
     dp = [x for x in dp if pd.notna(x[3]) and _norm(x[1].get("supplier"))]
     by_sup: dict[str, list] = {}
     for x in dp:
@@ -175,15 +194,15 @@ def run_audit(store: dict[str, pd.DataFrame], params: dict | None = None, today:
     for i, r in enumerate(_rows(store, "Revenue_Profession_Licenses")):
         d = _num(r.get("fee_due"))
         if d is not None:
-            aging("Revenue_Profession_Licenses", i, r.get("owner"), d - (_num(r.get("fee_paid")) or 0), pd.to_datetime(r.get("date"), errors="coerce"), "رخص المهن")
+            aging("Revenue_Profession_Licenses", i, r.get("owner"), d - (_num(r.get("fee_paid")) or 0), to_date(r.get("date")), "رخص المهن")
     for i, r in enumerate(_rows(store, "Revenue_Municipal_Properties_Leases")):
         d = _num(r.get("installment"))
         if d is not None and _blank(r.get("paid_date")):
-            aging("Revenue_Municipal_Properties_Leases", i, r.get("tenant"), d - (_num(r.get("paid_amount")) or 0), pd.to_datetime(r.get("due_date"), errors="coerce"), "أملاك مؤجرة")
+            aging("Revenue_Municipal_Properties_Leases", i, r.get("tenant"), d - (_num(r.get("paid_amount")) or 0), to_date(r.get("due_date")), "أملاك مؤجرة")
     for i, r in enumerate(_rows(store, "Revenue_Daily_Fees")):
         d = _num(r.get("amount_due"))
         if d is not None:
-            aging("Revenue_Daily_Fees", i, r.get("collector"), d - (_num(r.get("amount_collected")) or 0), pd.to_datetime(r.get("date"), errors="coerce"), "رسوم يومية")
+            aging("Revenue_Daily_Fees", i, r.get("collector"), d - (_num(r.get("amount_collected")) or 0), to_date(r.get("date")), "رسوم يومية")
 
     # 6) فصل الصلاحيات في سندات الصرف
     for i, r in enumerate(_rows(store, "Payment_Vouchers")):

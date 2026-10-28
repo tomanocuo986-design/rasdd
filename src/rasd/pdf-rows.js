@@ -31,7 +31,9 @@ export function linesToRows(lines, fields) {
     .filter((r) => Object.values(r).some(Boolean));
 }
 
-export async function extractPdfRows(file, fields) {
+import { extractPdfPages, ocrTextToLines } from "./pdf-text.js";
+
+export async function extractPdfRows(file, fields, onStatus) {
   const pdfjs = await import("pdfjs-dist");
   const worker = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
   pdfjs.GlobalWorkerOptions.workerSrc = worker;
@@ -62,6 +64,11 @@ export async function extractPdfRows(file, fields) {
       lines.push(cells);
     }
   }
-  if (!lines.length) throw Error("لم يتم العثور على نص في ملف PDF (قد يكون صورة ممسوحة)");
+  if (!lines.length) {
+    // Scanned PDF: fall back to OCR and split lines into cells by wide gaps.
+    const { pages } = await extractPdfPages(file, { ocr: true, onStatus });
+    for (const t of pages) lines.push(...ocrTextToLines(t));
+  }
+  if (!lines.length) throw Error("لم يتم العثور على نص في ملف PDF حتى بعد محاولة OCR");
   return linesToRows(lines, fields);
 }
