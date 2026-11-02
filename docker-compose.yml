@@ -1,0 +1,39 @@
+# Self-hosted stack:  docker compose up -d --build
+#   with a local LLM:  docker compose --profile local-llm up -d --build
+# Secrets come from a .env file next to this one (see .env.example). Never commit it.
+services:
+  app:
+    build: .
+    restart: unless-stopped        # always on: no cold starts
+    ports: ["3000:3000"]
+    environment:
+      DATABASE_URL: postgres://rasd:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/rasd
+      RASD_DATA_KEY: ${RASD_DATA_KEY:?set RASD_DATA_KEY (openssl rand -base64 32)}
+      RASD_DATA_KEY_PREV: ${RASD_DATA_KEY_PREV:-}
+      RASD_API_TOKENS: ${RASD_API_TOKENS:?set RASD_API_TOKENS (auditor:token,...)}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    depends_on:
+      db: { condition: service_healthy }
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rasd
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: rasd
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rasd"]
+      interval: 5s
+      retries: 10
+  ollama:
+    profiles: ["local-llm"]
+    image: ollama/ollama
+    restart: unless-stopped
+    volumes: ["ollama:/root/.ollama"]
+    # then:  docker compose exec ollama ollama pull qwen2.5:7b-instruct   and set LLM_BASE_URL=http://ollama:11434/v1
+volumes:
+  pgdata:
+  ollama:

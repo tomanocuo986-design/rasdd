@@ -1,0 +1,6 @@
+node_modules
+.output
+.git
+.env
+python/__pycache__
+*.log

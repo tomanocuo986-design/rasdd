@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: rasd-audit
+    runtime: node
+    plan: free
+    buildCommand: npm install --legacy-peer-deps && NITRO_PRESET=node-server npx vite build
+    startCommand: node start.mjs
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: GEMINI_API_KEY
+        sync: false # يُطلب منك إدخاله في لوحة Render (لا يُحفظ في GitHub)
