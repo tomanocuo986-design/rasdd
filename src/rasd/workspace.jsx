@@ -70,6 +70,7 @@ import { ExecutiveDashboard } from "./dashboard";
 import { RejectedAlert, CalibrationPanel } from "./panels";
 import { publishAssistantContext, summarizeAudit } from "./assistant-context.js";
 import { useManualObservations } from "./manual-observations";
+import { mergeSeedReports, markSeedRemoved } from "./seed-reports.js";
 import { DemoBar } from "./DemoBar.jsx";
 import { buildDemoPreviousReport, buildDemoStore, DEMO_FLAG_KEY, DEMO_PARAMS, DEMO_SNAPSHOT_KEY } from "./demo-data.js";
 const import_papaparse = { default: Papa };
@@ -4103,9 +4104,9 @@ var REPORTS = "rasd-audit-reports";
 function loadReports() {
   try {
     const v = JSON.parse(localStorage.getItem(REPORTS) ?? "[]");
-    return Array.isArray(v) ? v : [];
+    return mergeSeedReports(Array.isArray(v) ? v : []);
   } catch {
-    return [];
+    return mergeSeedReports([]);
   }
 }
 function storeReports(r) {
@@ -4138,7 +4139,7 @@ function seedDemoFromUrl() {
     url.searchParams.delete("demo");
     history.replaceState(null, "", url.pathname + url.search + url.hash);
     const stored = JSON.parse(localStorage.getItem("rasd-audit-store") ?? "{}") ?? {};
-    const hasData = Object.values(stored).some((r) => Array.isArray(r) && r.length) || loadReports().length > 0;
+    const hasData = Object.values(stored).some((r) => Array.isArray(r) && r.length) || (JSON.parse(localStorage.getItem(REPORTS) ?? "[]") ?? []).length > 0;
     if (hasData) return false;
     const { store, params, report } = buildDemoBundle();
     localStorage.setItem("rasd-audit-store", JSON.stringify(store));
@@ -4794,7 +4795,7 @@ function SectorAudit({ auditTab }) {
     const { store: demoStore, params: demoParams, base, report } = buildDemoBundle();
     setStore(demoStore);
     setParams(demoParams);
-    setReports([report]);
+    setReports(mergeSeedReports([report]));
     try {
       localStorage.setItem(DEMO_FLAG_KEY, "1");
     } catch {
@@ -4811,7 +4812,7 @@ function SectorAudit({ auditTab }) {
     setMsg(`تم تحميل العرض التجريبي: ${records} سجلًا افتراضيًا كشف المحرك فيها ${base.length} ملاحظة (${high} مرتفعة الخطورة).`);
   }
   function loadDemo() {
-    const hasData = Object.values(store).some((r) => Array.isArray(r) && r.length) || reports.length > 0;
+    const hasData = Object.values(store).some((r) => Array.isArray(r) && r.length) || reports.some((r) => !r.seed);
     if (hasData && !demoActive) {
       if (!window.confirm("سيحلّ العرض التجريبي مكان بياناتك وتقاريرك الحالية مؤقتًا. تُحفظ بياناتك كما هي وتعود عند الضغط على «الخروج واستعادة بياناتي». متابعة؟")) return;
       try {
@@ -4833,7 +4834,7 @@ function SectorAudit({ auditTab }) {
       snap = null;
     }
     setStore(snap?.store ?? {});
-    setReports(snap?.reports ?? []);
+    setReports(mergeSeedReports(snap?.reports ?? []));
     setParams({ ...defaultParams, ...(snap?.params ?? {}) });
     try {
       localStorage.removeItem(DEMO_SNAPSHOT_KEY);
@@ -5229,7 +5230,7 @@ function SectorAudit({ auditTab }) {
         active: demoActive,
         hasData:
           Object.values(store).some((r) => Array.isArray(r) && r.length) ||
-          reports.length > 0,
+          reports.some((r) => !r.seed),
         hasSnapshot: hasDemoSnapshot,
         summary: `${findings.length} ملاحظة مكتشفة حاليًا.`,
         onLoad: loadDemo,
@@ -5770,10 +5771,12 @@ function SectorAudit({ auditTab }) {
                                 variant: "ghost",
                                 size: "icon",
                                 "aria-label": `حذف ${r.name}`,
-                                onClick: () =>
+                                onClick: () => {
+                                  markSeedRemoved(r.id);
                                   setReports((p) =>
                                     p.filter((x) => x.id !== r.id),
-                                  ),
+                                  );
+                                },
                                 children: /* @__PURE__ */ (0,
                                 import_jsx_runtime.jsx)(Trash2, {}),
                               },

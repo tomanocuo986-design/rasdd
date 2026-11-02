@@ -30,7 +30,7 @@ describe("demo mode in the audit workspace", () => {
     });
     expect(localStorage.getItem("rasd-demo-active")).toBe("1");
     const reports = JSON.parse(localStorage.getItem("rasd-audit-reports") ?? "[]");
-    expect(reports).toHaveLength(1);
+    expect(reports.filter((r: any) => !r.seed)).toHaveLength(1);
   });
 
   it("restores the user's own data when leaving the demo", async () => {
