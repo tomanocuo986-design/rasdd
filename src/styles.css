@@ -70,7 +70,7 @@
 .rasd-ad-primary{background:var(--primary);color:var(--primary-foreground);border-color:transparent}
 .rasd-ad-danger{color:var(--danger);border-color:var(--danger)}
 
-/* ===== شاشة تسجيل الدخول + OTP ===== */
+/* ===== شاشة تسجيل الدخول ===== */
 .auth-screen{position:fixed;inset:0;z-index:200;display:grid;place-items:center;background:var(--background);overflow:hidden;padding:1rem}
 .auth-orb{position:absolute;border-radius:50%;filter:blur(70px);opacity:.55;animation:auth-float 9s ease-in-out infinite}
 .auth-orb-1{width:340px;height:340px;background:var(--primary);top:-90px;inset-inline-start:-80px}

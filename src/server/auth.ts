@@ -1,19 +1,18 @@
-// Email + password + one-time code (OTP) sign-in.
-//   POST /api/auth {action:"start", email, password}   -> sends a 6-digit code to the email, returns {challenge, mode}
-//   POST /api/auth {action:"verify", challenge, code}   -> sets a 30-day signed session cookie
-//   POST /api/auth {action:"logout"}                    -> clears the cookie
-//   GET  /api/auth                                      -> {user:{email}|null}
-// Users: PostgreSQL if DATABASE_URL is set, otherwise a JSON file in AUTH_DATA_DIR (default ./data).
-// Email: Resend (RESEND_API_KEY) or SMTP (SMTP_HOST...). With neither, the code is printed in the server console.
-import { createHmac, randomBytes, randomInt, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
+// Employee-ID + password sign-in (no email, no OTP).
+//   POST /api/auth {action:"register", employeeId, password, confirm} -> creates the account, sets a 30-day signed session cookie
+//   POST /api/auth {action:"login", employeeId, password}              -> sets the session cookie
+//   POST /api/auth {action:"logout"}                                   -> clears the cookie
+//   GET  /api/auth                                                     -> {user:{employeeId}|null}
+// Users: PostgreSQL if DATABASE_URL is set (persistent), otherwise a JSON file in AUTH_DATA_DIR (default ./data).
+import { createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
 const COOKIE = "rasd_session";
 const SESSION_MS = 30 * 24 * 3600 * 1000;
-const CODE_MS = 10 * 60 * 1000;
-const MAX_ATTEMPTS = 5;
-const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,}$/;
+const MAX_ATTEMPTS = 8;
+const LOCK_MS = 10 * 60 * 1000;
+const ID_RE = /^[A-Za-z0-9\-_.]{3,32}$/;
 
 const env = (k: string) => process.env[k];
 const dataDir = () => path.resolve(env("AUTH_DATA_DIR") ?? "./data");
@@ -54,8 +53,6 @@ async function unsign<T>(token: string | undefined): Promise<T | null> {
     return null;
   }
 }
-const codeMac = async (code: string, salt: string) =>
-  createHmac("sha256", await secret()).update(`${salt}:${code}`).digest("hex");
 
 // ---------- passwords ----------
 const scrypt = (pw: string, salt: Buffer) =>
@@ -73,10 +70,10 @@ async function checkPassword(pw: string, stored: string) {
 }
 
 // ---------- user store ----------
-type User = { email: string; passwordHash: string; createdAt: string };
+type User = { employeeId: string; passwordHash: string; createdAt: string };
 interface Store {
-  get(email: string): Promise<User | null>;
-  create(u: User): Promise<void>;
+  get(employeeId: string): Promise<User | null>;
+  create(u: User): Promise<boolean>; // false if the employee ID already exists
 }
 function fileStore(): Store {
   const f = path.join(dataDir(), "users.json");
@@ -88,12 +85,14 @@ function fileStore(): Store {
     }
   };
   return {
-    get: async (email) => (await read())[email] ?? null,
+    get: async (id) => (await read())[id] ?? null,
     create: async (u) => {
       const all = await read();
-      all[u.email] = u;
+      if (all[u.employeeId]) return false;
+      all[u.employeeId] = u;
       await fs.mkdir(dataDir(), { recursive: true });
       await fs.writeFile(f, JSON.stringify(all, null, 2), { mode: 0o600 });
+      return true;
     },
   };
 }
@@ -108,64 +107,45 @@ function pgStore(): Store {
         ssl: env("DATABASE_SSL") === "require" ? { rejectUnauthorized: false } : undefined,
       });
       await p.query(
-        `create table if not exists rasd_users (email text primary key, password_hash text not null, created_at timestamptz not null default now())`,
+        `create table if not exists rasd_users_emp (employee_id text primary key, password_hash text not null, created_at timestamptz not null default now())`,
       );
       return p;
     })());
   return {
-    get: async (email) => {
-      const r = await (await getPool()).query("select * from rasd_users where email=$1", [email]);
+    get: async (employeeId) => {
+      const r = await (await getPool()).query("select * from rasd_users_emp where employee_id=$1", [employeeId]);
       return r.rows[0]
-        ? { email, passwordHash: r.rows[0].password_hash, createdAt: new Date(r.rows[0].created_at).toISOString() }
+        ? { employeeId, passwordHash: r.rows[0].password_hash, createdAt: new Date(r.rows[0].created_at).toISOString() }
         : null;
     },
     create: async (u) => {
-      await (await getPool()).query(
-        "insert into rasd_users(email,password_hash) values($1,$2) on conflict (email) do nothing",
-        [u.email, u.passwordHash],
+      const r = await (await getPool()).query(
+        "insert into rasd_users_emp(employee_id,password_hash) values($1,$2) on conflict (employee_id) do nothing",
+        [u.employeeId, u.passwordHash],
       );
+      return r.rowCount === 1;
     },
   };
 }
 const store = () => (env("DATABASE_URL") ? pgStore() : fileStore());
 
-// ---------- email ----------
-async function sendCode(to: string, code: string) {
-  const subject = "رمز الدخول إلى رصد";
-  const text = `رمز التحقق الخاص بك: ${code}\nصالح لمدة 10 دقائق. إذا لم تطلبه فتجاهل هذه الرسالة.`;
-  const html = `<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;max-width:420px;margin:auto;padding:24px;border:1px solid #e5e5e5;border-radius:12px">
-<h2 style="margin:0 0 8px">رصد</h2><p style="color:#555">رمز التحقق الخاص بك:</p>
-<div style="font-size:34px;letter-spacing:10px;font-weight:700;background:#fde047;border-radius:10px;padding:14px;text-align:center;direction:ltr">${code}</div>
-<p style="color:#888;font-size:12px">صالح لمدة 10 دقائق. إذا لم تطلبه فتجاهل هذه الرسالة.</p></div>`;
-  const from = env("MAIL_FROM") ?? "Rasd <onboarding@resend.dev>";
-
-  if (env("RESEND_API_KEY")) {
-    const r = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { authorization: `Bearer ${env("RESEND_API_KEY")}`, "content-type": "application/json" },
-      body: JSON.stringify({ from, to, subject, html, text }),
-    });
-    if (!r.ok) throw new Error(`Resend ${r.status}: ${await r.text()}`);
-    return;
-  }
-  if (env("SMTP_HOST")) {
-    // @ts-ignore - nodemailer is a runtime dependency
-    const nm = await import("nodemailer");
-    const t = nm.default.createTransport({
-      host: env("SMTP_HOST"),
-      port: Number(env("SMTP_PORT") ?? 587),
-      secure: Number(env("SMTP_PORT") ?? 587) === 465,
-      auth: env("SMTP_USER") ? { user: env("SMTP_USER"), pass: env("SMTP_PASS") } : undefined,
-    });
-    await t.sendMail({ from: env("SMTP_FROM") ?? env("MAIL_FROM") ?? env("SMTP_USER"), to, subject, text, html });
-    return;
-  }
-  console.log(`\n[auth] (no email provider configured) code for ${to}: ${code}\n`);
-}
-
 // ---------- rate limiting (in memory) ----------
-const attempts = new Map<string, number>();
-const lastSent = new Map<string, number>();
+const fails = new Map<string, { n: number; until: number }>();
+const locked = (k: string) => {
+  const f = fails.get(k);
+  return !!f && f.n >= MAX_ATTEMPTS && Date.now() < f.until;
+};
+const noteFail = (k: string) => {
+  const f = fails.get(k);
+  const n = f && Date.now() < f.until ? f.n + 1 : 1;
+  fails.set(k, { n, until: Date.now() + LOCK_MS });
+};
+const normId = (v: unknown) =>
+  String(v ?? "")
+    .trim()
+    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x660))
+    .replace(/[\u06f0-\u06f9]/g, (d) => String(d.charCodeAt(0) - 0x6f0))
+    .toUpperCase();
 
 // ---------- http helpers ----------
 const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
@@ -180,9 +160,9 @@ const cookieHeader = (value: string, maxAge: number, req: Request) => {
 const readCookie = (req: Request) =>
   (req.headers.get("cookie") ?? "").split(/;\s*/).find((c) => c.startsWith(COOKIE + "="))?.slice(COOKIE.length + 1);
 
-export async function currentUser(req: Request): Promise<{ email: string } | null> {
+export async function currentUser(req: Request): Promise<{ employeeId: string } | null> {
   const s = await unsign<{ e: string; exp: number }>(readCookie(req));
-  return s ? { email: s.e } : null;
+  return s ? { employeeId: s.e } : null;
 }
 
 export async function handleGet(req: Request) {
@@ -199,54 +179,31 @@ export async function handlePost(req: Request) {
 
   if (body.action === "logout") return json(200, { ok: true }, { "set-cookie": cookieHeader("", 0, req) });
 
-  if (body.action === "start") {
-    const email = String(body.email ?? "").trim().toLowerCase();
+  if (body.action === "register" || body.action === "login") {
+    const employeeId = normId(body.employeeId);
     const password = String(body.password ?? "");
-    if (!EMAIL_RE.test(email)) return json(400, { error: "invalid_email" });
+    if (!ID_RE.test(employeeId)) return json(400, { error: "invalid_id" });
     if (password.length < 8 || password.length > 200) return json(400, { error: "weak_password" });
-    if (Date.now() - (lastSent.get(email) ?? 0) < 30_000) return json(429, { error: "too_soon" });
+    const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
+    const keys = [`id:${employeeId}`, `ip:${ip}`];
+    if (keys.some(locked)) return json(429, { error: "too_many_attempts" });
 
-    const user = await store().get(email);
-    let mode: "signup" | "signin";
-    let passwordHash: string;
-    if (user) {
-      if (!(await checkPassword(password, user.passwordHash))) return json(401, { error: "wrong_password" });
-      mode = "signin";
-      passwordHash = user.passwordHash;
+    if (body.action === "register") {
+      if (password !== String(body.confirm ?? "")) return json(400, { error: "mismatch" });
+      if (await store().get(employeeId)) return json(409, { error: "exists" });
+      const passwordHash = await hashPassword(password);
+      if (!(await store().create({ employeeId, passwordHash, createdAt: new Date().toISOString() })))
+        return json(409, { error: "exists" });
     } else {
-      mode = "signup";
-      passwordHash = await hashPassword(password);
+      const user = await store().get(employeeId);
+      if (!user || !(await checkPassword(password, user.passwordHash))) {
+        keys.forEach(noteFail);
+        return json(401, { error: "wrong_credentials" });
+      }
     }
-
-    const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-    const salt = randomBytes(8).toString("hex");
-    try {
-      await sendCode(email, code);
-    } catch (e) {
-      console.error("[auth] email send failed:", e);
-      return json(502, { error: "email_failed" });
-    }
-    lastSent.set(email, Date.now());
-    const challenge = await sign({ e: email, s: salt, c: await codeMac(code, salt), m: mode, p: passwordHash, exp: Date.now() + CODE_MS });
-    return json(200, { challenge, mode });
-  }
-
-  if (body.action === "verify") {
-    const ch = await unsign<{ e: string; s: string; c: string; m: string; p: string; exp: number }>(body.challenge);
-    if (!ch) return json(400, { error: "expired" });
-    const key = ch.s;
-    const n = (attempts.get(key) ?? 0) + 1;
-    attempts.set(key, n);
-    if (n > MAX_ATTEMPTS) return json(429, { error: "too_many_attempts" });
-    const code = String(body.code ?? "").replace(/\D/g, "");
-    const given = Buffer.from(await codeMac(code, ch.s), "hex");
-    const want = Buffer.from(ch.c, "hex");
-    if (code.length !== 6 || given.length !== want.length || !timingSafeEqual(given, want))
-      return json(401, { error: "wrong_code", left: MAX_ATTEMPTS - n });
-    attempts.delete(key);
-    if (ch.m === "signup") await store().create({ email: ch.e, passwordHash: ch.p, createdAt: new Date().toISOString() });
-    const session = await sign({ e: ch.e, exp: Date.now() + SESSION_MS });
-    return json(200, { user: { email: ch.e }, mode: ch.m }, { "set-cookie": cookieHeader(session, SESSION_MS / 1000, req) });
+    keys.forEach((k) => fails.delete(k));
+    const session = await sign({ e: employeeId, exp: Date.now() + SESSION_MS });
+    return json(200, { user: { employeeId }, mode: body.action }, { "set-cookie": cookieHeader(session, SESSION_MS / 1000, req) });
   }
   return json(400, { error: "bad_request" });
 }
