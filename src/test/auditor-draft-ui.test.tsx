@@ -64,6 +64,12 @@ async function fill(labelText: string, value: string) {
   });
 }
 
+
+async function tickNoBasis() {
+  const box = host.querySelector(".rasd-ad-check input") as HTMLInputElement | null;
+  if (box) await act(async () => box.click());
+}
+
 const until = async (cond: () => boolean, ms = 4000) => {
   const end = Date.now() + ms;
   while (!cond() && Date.now() < end) await act(async () => new Promise((r) => setTimeout(r, 60)));
@@ -92,6 +98,8 @@ describe("AuditorDraft flow", () => {
 
     await click("✓ اعتماد");
     expect(getManualObservations()).toHaveLength(0); // not inserted until the final approval
+    expect(btn("اعتماد نهائي").disabled).toBe(true); // no library basis: needs explicit confirmation
+    await tickNoBasis();
     await click("اعتماد نهائي");
     expect(getManualObservations()).toHaveLength(1);
     expect(loadIds("approved").has(getManualObservations()[0]!.id)).toBe(true);
@@ -124,8 +132,40 @@ describe("AuditorDraft flow", () => {
     await click("حفظ التعديلات");
     expect(text()).toContain("عدّلتَ الخطورة يدويًا");
     await click("✓ اعتماد");
+    await tickNoBasis();
     await click("اعتماد نهائي");
     expect(getManualObservations()[0]?.risk.rating).toBe("high");
+  });
+
+  it("a new observation (not in past reports) is formulated with the five elements and marked new", async () => {
+    await mount(<AuditorDraft />);
+    await fill("نص الملاحظة", "لوحظ عدم وجود سجل لعهدة الأجهزة الحاسوبية لدى قسم المعلومات");
+    await click("حلّل وقارن");
+    await until(() => !!btn("✓ اعتماد"));
+    expect(text()).toContain("جديدة · لم ترد في التقارير السابقة");
+    for (const k of ["الحالة", "السند القانوني", "السبب", "الأثر", "التوصية"]) expect(text()).toContain(k);
+    await click("✓ اعتماد");
+    await tickNoBasis();
+    await click("اعتماد نهائي");
+    const o = getManualObservations()[0]!;
+    expect(o.isNew).toBe(true);
+    expect(o.condition.startsWith("لوحظ")).toBe(true);
+    expect(o.cause && o.effect && o.recommendation).toBeTruthy();
+  });
+
+  it("edit lets the auditor write the legal basis, which then passes the legal gate without confirmation", async () => {
+    await mount(<AuditorDraft />);
+    await fill("نص الملاحظة", "لوحظ عدم وجود سجل لعهدة الأجهزة الحاسوبية لدى قسم المعلومات");
+    await click("حلّل وقارن");
+    await until(() => !!btn("✎ تعديل"));
+    await click("✎ تعديل");
+    await fill("السند القانوني", "نظام المشتريات — المادة (12)");
+    await click("حفظ التعديلات");
+    expect(text()).toContain("نظام المشتريات — المادة (12)");
+    await click("✓ اعتماد");
+    expect(host.querySelector(".rasd-ad-check")).toBeNull();
+    await click("اعتماد نهائي");
+    expect(getManualObservations()[0]?.legalBasis.source).toBe("auditor");
   });
 });
 
