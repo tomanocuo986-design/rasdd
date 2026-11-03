@@ -41,7 +41,6 @@ export function AssistantChat() {
     }
   });
   const [approval, setApproval] = useState(null); // { description, resolve }
-  const [draftMode, setDraftMode] = useState(false); // الرسالة التالية وصف ملاحظة رقابية تُصاغ وتُعرض للاعتماد
   const abortRef = useRef(null);
   const endRef = useRef(null);
   const ctx = useSyncExternalStore(subscribeAssistantContext, getAssistantContext, () => null);
@@ -134,11 +133,10 @@ export function AssistantChat() {
     if (!content || busy) return;
     const history = [...messages, { role: "user", content }];
     // وصف ملاحظة رقابية (صياغة صريحة أو عبارة «لوحظ…»): تُقارَن بالتقارير السابقة وتُصاغ محليًا وتنتظر قرار المدقق
-    if (mode === "chat" && (draftMode || isObservationText(content))) {
+    if (mode === "chat" && isObservationText(content)) {
       setMessages([...history, { role: "assistant", content: DRAFT_NOTE, draftFor: content }]);
       setInput("");
       setError("");
-      setDraftMode(false);
       return;
     }
     // RAG: نجلب مقاطع الأنظمة ذات الصلة من مكتبة المدقق (إن وُجدت) قبل الإرسال
@@ -254,15 +252,6 @@ export function AssistantChat() {
             <button type="button" className="rasd-ai-analyze" onClick={() => setView("draft")}>
               ✎ اكتب مسودة مدقق
             </button>
-            <button
-              type="button"
-              className="rasd-ai-analyze rasd-ai-draft-toggle"
-              aria-pressed={draftMode}
-              disabled={busy}
-              onClick={() => setDraftMode((v) => !v)}
-            >
-              {draftMode ? "✓ صياغة ملاحظة: اكتب وصفها في الأسفل" : "✎ صغ ملاحظة رقابية من وصفي"}
-            </button>
             {lastReply && !busy && (
               <button
                 type="button"
@@ -348,7 +337,7 @@ export function AssistantChat() {
               value={input}
               rows={1}
               maxLength={4000}
-              placeholder={draftMode ? "صف الملاحظة كما رصدتها، مثال: لوحظ صرف مبلغ دون مستند…" : "اكتب سؤالك…"}
+              placeholder="اكتب سؤالك…"
               aria-label="سؤالك"
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
