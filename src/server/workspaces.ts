@@ -25,6 +25,8 @@ export type Deps = {
   ring: KeyRing;
   tokens: Map<string, string>; // sha256(token) hex -> owner
   maxPayloadBytes: number;
+  /** اختياري: يُستدعى بعد كل سحب/دفع/حذف ناجح لمساحة عمل (سجل التدقيق). لا يُمرَّر فيه محتوى المساحة. */
+  audit?: (e: { actor: string; action: string; target: string; detail: string }) => void;
 };
 
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -83,6 +85,7 @@ export async function handleWorkspaces(request: Request, deps: Deps): Promise<Re
     if (request.method === "GET") {
       const row = await deps.repo.get(owner, id);
       if (!row) return err(404, "مساحة العمل غير موجودة.");
+      deps.audit?.({ actor: owner, action: "workspace.pull", target: id, detail: `version=${row.version}` });
       return json(200, {
         id,
         name: decryptField(deps.ring, row.nameEnc, aad(id)),
@@ -121,11 +124,14 @@ export async function handleWorkspaces(request: Request, deps: Deps): Promise<Re
       );
       if (!r.ok)
         return err(409, "تغيّرت النسخة على الخادم منذ آخر مزامنة (تعارض).", { currentVersion: r.current });
+      deps.audit?.({ actor: owner, action: "workspace.push", target: id, detail: `version=${r.version}` });
       return json(200, { id, version: r.version });
     }
 
     if (request.method === "DELETE") {
-      return (await deps.repo.remove(owner, id)) ? json(200, { ok: true }) : err(404, "مساحة العمل غير موجودة.");
+      if (!(await deps.repo.remove(owner, id))) return err(404, "مساحة العمل غير موجودة.");
+      deps.audit?.({ actor: owner, action: "workspace.delete", target: id, detail: "" });
+      return json(200, { ok: true });
     }
     return err(405, "الطريقة غير مدعومة.");
   } catch (e) {

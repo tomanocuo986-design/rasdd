@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { allDatasets, auditSectors, runAudit } from "./workspace.jsx";
 import { AuditorDraft } from "./AuditorDraft.jsx";
+import { listRegulations } from "./regulations-db.js";
+import { buildQuery, retrievePassages, toPayload } from "./legal-retrieval.js";
+import { makeToolbox } from "./agent-wiring.js";
+import { runAgent } from "./agent-loop.js";
 import { CHAT_PHASES, ThinkingIndicator, usePhaseLabel } from "./ThinkingIndicator.jsx";
 import {
   getAssistantContext,
@@ -24,6 +28,14 @@ export function AssistantChat() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [agentOn, setAgentOn] = useState(() => {
+    try {
+      return localStorage.getItem("rasd-agent-mode") !== "off";
+    } catch {
+      return true;
+    }
+  });
+  const [approval, setApproval] = useState(null); // { description, resolve }
   const abortRef = useRef(null);
   const endRef = useRef(null);
   const ctx = useSyncExternalStore(subscribeAssistantContext, getAssistantContext, () => null);
@@ -33,6 +45,64 @@ export function AssistantChat() {
   }, [messages, open]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  const toggleAgent = (on) => {
+    setAgentOn(on);
+    try {
+      localStorage.setItem("rasd-agent-mode", on ? "on" : "off");
+    } catch {}
+  };
+
+  // نص يُلحق بآخر رد، وخطوات أدوات تُحدَّث حسب المعرّف
+  const patchLast = (fn) =>
+    setMessages((m) => {
+      const copy = m.slice();
+      copy[copy.length - 1] = fn(copy[copy.length - 1]);
+      return copy;
+    });
+
+  async function sendAgent(content, history, passages, controller) {
+    const toolbox = makeToolbox();
+    const callStep = async ({ messages, step }) => {
+      const res = await fetch("/api/agent", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          messages,
+          step,
+          context: serializeAssistantContext(ctx),
+          passages: passages.length ? passages : undefined,
+        }),
+      });
+      if (!res.ok) {
+        let msg = "تعذّر الحصول على رد.";
+        try {
+          msg = (await res.json()).error || msg;
+        } catch {}
+        throw new Error(msg);
+      }
+      return res.json();
+    };
+    const approve = (call, description) =>
+      new Promise((resolve) => {
+        controller.signal.addEventListener("abort", () => resolve(false), { once: true });
+        setApproval({ description, resolve });
+      }).finally(() => setApproval(null));
+    const onEvent = (ev) => {
+      if (ev.type === "text") patchLast((l) => ({ ...l, content: ev.text }));
+      else if (ev.type === "tool")
+        patchLast((l) => {
+          const tools = (l.tools ?? []).slice();
+          const i = tools.findIndex((t) => t.id === ev.id);
+          const next = { id: ev.id, name: ev.name, status: ev.status, description: ev.description };
+          if (i >= 0) tools[i] = next;
+          else tools.push(next);
+          return { ...l, tools };
+        });
+    };
+    await runAgent({ history, callStep, toolbox, approve, onEvent, signal: controller.signal });
+  }
 
   // ما يفعله المساعد الآن: يتغير النص حسب نوع الطلب ومدة الانتظار
   const waiting = busy && !messages[messages.length - 1]?.content;
@@ -57,7 +127,17 @@ export function AssistantChat() {
     const content = text.trim().slice(0, 4000);
     if (!content || busy) return;
     const history = [...messages, { role: "user", content }];
-    setMessages([...history, { role: "assistant", content: "" }]);
+    // RAG: نجلب مقاطع الأنظمة ذات الصلة من مكتبة المدقق (إن وُجدت) قبل الإرسال
+    let passages = [];
+    try {
+      const docs = await listRegulations();
+      if (docs?.length) {
+        passages = toPayload(
+          retrievePassages(docs, buildQuery(content, ctx, mode), { k: mode === "chat" ? 4 : 6 }),
+        );
+      }
+    } catch {}
+    setMessages([...history, { role: "assistant", content: "", sources: passages.map((p) => p.source) }]);
     setInput("");
     setError("");
     setCurMode(mode);
@@ -65,6 +145,10 @@ export function AssistantChat() {
     const controller = new AbortController();
     abortRef.current = controller;
     try {
+      if (agentOn && mode === "chat") {
+        await sendAgent(content, history, passages, controller);
+        return;
+      }
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -72,6 +156,7 @@ export function AssistantChat() {
         body: JSON.stringify({
           messages: history.slice(-20),
           context: serializeAssistantContext(ctx),
+          passages: passages.length ? passages : undefined,
           mode,
         }),
       });
@@ -139,6 +224,10 @@ export function AssistantChat() {
             <AuditorDraft />
           </div>
           <div className="rasd-ai-body" aria-live="polite" hidden={view !== "chat"}>
+            <label className="rasd-ai-agent-toggle">
+              <input type="checkbox" checked={agentOn} onChange={(e) => toggleAgent(e.target.checked)} />
+              وضع الوكيل: يستخدم أدوات للبحث في ملاحظاتك ومكتبة الأنظمة
+            </label>
             <button
               type="button"
               className="rasd-ai-analyze"
@@ -174,12 +263,48 @@ export function AssistantChat() {
             )}
             {messages.map((m, i) => (
               <div key={i} className={`rasd-ai-msg rasd-ai-${m.role}`}>
+                {m.tools?.length > 0 && (
+                  <ul className="rasd-ai-tools" aria-label="خطوات الوكيل">
+                    {m.tools.map((t) => (
+                      <li key={t.id} className="rasd-ai-tool" data-status={t.status}>
+                        <span aria-hidden>
+                          {{ running: "⏳", awaiting: "✋", done: "✓", error: "⚠", denied: "✗" }[t.status] ?? "•"}
+                        </span>
+                        <span>{t.description}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {m.content || (busy && i === messages.length - 1 ? <ThinkingIndicator label={waitLabel} /> : "…")}
                 {m.content && busy && i === messages.length - 1 && (
                   <ThinkingIndicator compact label="يكتب الرد…" />
                 )}
+                {m.role === "assistant" && m.content && m.sources?.length > 0 && (
+                  <details className="rasd-ai-sources">
+                    <summary>مصادر من مكتبة الأنظمة ({m.sources.length})</summary>
+                    <ul>
+                      {m.sources.map((src, j) => (
+                        <li key={j}>{src}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </div>
             ))}
+            {approval && (
+              <div className="rasd-ai-approve" role="alertdialog" aria-label="طلب موافقة">
+                <strong>يطلب الوكيل تنفيذ إجراء يغيّر سجلك:</strong>
+                <span>{approval.description}</span>
+                <div className="rasd-ai-approve-actions">
+                  <button type="button" data-primary onClick={() => approval.resolve(true)}>
+                    موافقة
+                  </button>
+                  <button type="button" onClick={() => approval.resolve(false)}>
+                    رفض
+                  </button>
+                </div>
+              </div>
+            )}
             {error && (
               <p className="rasd-ai-error" role="alert">
                 {error}

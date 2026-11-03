@@ -10,6 +10,8 @@ const ERR: Record<string, string> = {
   exists: "هذا الرقم الوظيفي مسجّل من قبل، سجّل دخول",
   wrong_credentials: "الرقم الوظيفي أو الباسورد غير صحيح",
   too_many_attempts: "محاولات كثيرة، حاول بعد 10 دقائق",
+  invite_required: "رمز الدعوة غير صحيح، اطلبه من مدير النظام",
+  registration_closed: "التسجيل مغلق، اطلب من مدير النظام إنشاء حسابك",
 };
 
 const idx = (i: number) => ({ "--i": i }) as CSSProperties;
@@ -57,6 +59,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [employeeId, setEmployeeId] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+  const [policy, setPolicy] = useState<"open" | "invite" | "closed">("open");
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -65,7 +69,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     fetch("/api/auth", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((d) => setStep(d.user ? "in" : "form"))
+      .then((d) => {
+        if (d.registration === "invite" || d.registration === "closed") setPolicy(d.registration);
+        if (d.registration === "closed") setMode("login");
+        setStep(d.user ? "in" : "form");
+      })
       .catch(() => setStep("form"));
   }, []);
 
@@ -82,7 +90,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     setBusy(true);
     const { ok, data } = await api(
       mode === "register"
-        ? { action: "register", employeeId, password, confirm }
+        ? { action: "register", employeeId, password, confirm, inviteCode }
         : { action: "login", employeeId, password },
     );
     setBusy(false);
@@ -174,6 +182,20 @@ export function AuthGate({ children }: { children: ReactNode }) {
                 />
               </label>
             )}
+            {mode === "register" && policy === "invite" && (
+              <label className="auth-field auth-expand" style={idx(5)}>
+                <span>رمز الدعوة</span>
+                <input
+                  type="password"
+                  dir="ltr"
+                  autoComplete="off"
+                  required
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  placeholder="يزوّدك به مدير النظام"
+                />
+              </label>
+            )}
             {error && (
               <p className="auth-error" role="alert">
                 {error}
@@ -193,9 +215,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
               )}
             </button>
             <div className="auth-links" style={{ ...idx(7), justifyContent: "center", marginTop: ".8rem" }}>
-              <button type="button" onClick={() => switchMode(mode === "register" ? "login" : "register")}>
-                {mode === "register" ? "عندي حساب؟ سجّل دخول" : "ما عندي حساب؟ أنشئ حساب"}
-              </button>
+              {policy !== "closed" && (
+                <button type="button" onClick={() => switchMode(mode === "register" ? "login" : "register")}>
+                  {mode === "register" ? "عندي حساب؟ سجّل دخول" : "ما عندي حساب؟ أنشئ حساب"}
+                </button>
+              )}
             </div>
           </form>
         )}

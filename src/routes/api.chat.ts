@@ -1,5 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
+import { currentUser } from "../server/auth.ts";
+import { logEvent } from "../server/audit-log.ts";
+import { can } from "../server/roles.ts";
 
 import {
   geminiBody,
@@ -25,6 +28,11 @@ const bodySchema = z.object({
     .min(1)
     .max(MAX_TURNS),
   context: z.string().max(14000).optional(),
+  // مقاطع من مكتبة الأنظمة التي اختارها المتصفح (RAG)؛ تُعامل كبيانات للاستشهاد فقط
+  passages: z
+    .array(z.object({ source: z.string().min(1).max(200), text: z.string().min(1).max(1200) }))
+    .max(8)
+    .optional(),
   mode: z.enum(["chat", "analyze", "report"]).optional(),
 });
 
@@ -58,6 +66,10 @@ export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
       POST: async ({ request }: { request: Request }) => {
+        // المساعد يستهلك مفتاح النموذج: لا يُستخدم إلا بجلسة دخول صالحة
+        const user = await currentUser(request).catch(() => null);
+        if (!user) return json(401, "سجّل الدخول لاستخدام المساعد.");
+        if (!can(user.role, "chat.use")) return json(403, "لا تملك صلاحية استخدام المساعد.");
         const provider = providerFromEnv();
         if (!provider)
           return json(503, "المساعد غير مفعّل: اضبط LLM_BASE_URL (نموذج محلي) أو GEMINI_API_KEY على الخادم.");
@@ -70,10 +82,17 @@ export const Route = createFileRoute("/api/chat")({
           return json(400, "طلب غير صالح.");
         }
         if (!parsed.success) return json(400, "طلب غير صالح.");
-        const { messages, context, mode } = parsed.data;
+        const { messages, context, mode, passages } = parsed.data;
         if (messages[messages.length - 1].role !== "user") return json(400, "طلب غير صالح.");
 
-        const system = systemFor(mode, context);
+        const system = systemFor(mode, context, passages);
+        // نسجّل حدوث الاستخدام فقط (الوضع وعدد المقاطع)، لا نص السؤال ولا بيانات التدقيق
+        void logEvent({
+          actor: user.employeeId,
+          role: user.role,
+          action: "ai.chat",
+          detail: `mode=${mode ?? "chat"} passages=${passages?.length ?? 0}`,
+        });
         const maxTokens = maxTokensFor(mode);
 
         let upstream: Response | undefined;

@@ -11,3 +11,11 @@ services:
         value: "22"
       - key: GEMINI_API_KEY
         sync: false # يُطلب منك إدخاله في لوحة Render (لا يُحفظ في GitHub)
+      - key: DATABASE_URL
+        sync: false # مطلوب للإنتاج: حسابات المستخدمين وسجل التدقيق يُمسحان مع كل نشر بدونه
+      - key: AUTH_REGISTRATION
+        value: invite
+      - key: AUTH_INVITE_CODE
+        sync: false # رمز دعوة تعطيه للمدققين عند إنشاء حساباتهم
+      - key: RASD_ADMINS
+        sync: false # الأرقام الوظيفية للمديرين، مفصولة بفواصل

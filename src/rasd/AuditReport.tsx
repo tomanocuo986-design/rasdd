@@ -1,3 +1,4 @@
+import { trackEvent } from "./audit-trail.js";
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import {
   OBS_LABELS,
@@ -99,6 +100,7 @@ export function AuditReport({ Button, sevLabel, sevClass, datasetLabel, loadSave
     if (!next.delete(id)) next.add(id);
     setApproved(next);
     saveIds("approved", next);
+    if (next.has(id)) trackEvent("ui.finding.approve", id);
   };
   const restore = () => {
     setDeleted(new Set());
@@ -132,6 +134,7 @@ export function AuditReport({ Button, sevLabel, sevClass, datasetLabel, loadSave
         observations,
         compliance,
       });
+      trackEvent("ui.report.export", `audit-${date}`, `observations=${observations.length}; approved=${approved.size}`);
       setMsg("تم تنزيل التقرير الرقابي بصيغة PDF");
     } catch {
       setMsg("تعذر إنشاء ملف PDF");

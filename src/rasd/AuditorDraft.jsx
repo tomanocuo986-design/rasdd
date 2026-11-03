@@ -13,6 +13,7 @@ import {
   loadCorpus,
   reviewMemo,
 } from "./auditor-draft.js";
+import { trackEvent } from "./audit-trail.js";
 import { DECISIONS, loadReviewLog, recordDecision, saveReviewLog } from "./review-log.js";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -96,11 +97,13 @@ export function AuditorDraft() {
     saveIds("approved", new Set([...loadIds("approved"), o.id]));
     addManualObservation(o);
     logDecision(DECISIONS.confirmed);
+    trackEvent("ui.draft.approve", o.id, draft.title || deriveTitle(draft.text));
     setStage("done");
   }
 
   function confirmDelete() {
     logDecision(DECISIONS.falsePositive, reason.trim());
+    trackEvent("ui.draft.delete", "", draft.title || deriveTitle(draft.text));
     setStage("deleted");
   }
 

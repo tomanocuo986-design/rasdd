@@ -7,6 +7,8 @@
 import { createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { auditStore, logEvent, verifyChain } from "./audit-log.ts";
+import { can, effectiveRole, isClientEvent, isRole, registrationPolicy, type Role } from "./roles.ts";
 
 const COOKIE = "rasd_session";
 const SESSION_MS = 30 * 24 * 3600 * 1000;
@@ -70,10 +72,12 @@ async function checkPassword(pw: string, stored: string) {
 }
 
 // ---------- user store ----------
-type User = { employeeId: string; passwordHash: string; createdAt: string };
+type User = { employeeId: string; passwordHash: string; createdAt: string; role?: Role };
 interface Store {
   get(employeeId: string): Promise<User | null>;
   create(u: User): Promise<boolean>; // false if the employee ID already exists
+  setRole(employeeId: string, role: Role): Promise<boolean>; // false if the user does not exist
+  list(): Promise<User[]>;
 }
 function fileStore(): Store {
   const f = path.join(dataDir(), "users.json");
@@ -94,6 +98,14 @@ function fileStore(): Store {
       await fs.writeFile(f, JSON.stringify(all, null, 2), { mode: 0o600 });
       return true;
     },
+    setRole: async (id, role) => {
+      const all = await read();
+      if (!all[id]) return false;
+      all[id] = { ...all[id], role };
+      await fs.writeFile(f, JSON.stringify(all, null, 2), { mode: 0o600 });
+      return true;
+    },
+    list: async () => Object.values(await read()),
   };
 }
 function pgStore(): Store {
@@ -109,15 +121,25 @@ function pgStore(): Store {
       await p.query(
         `create table if not exists rasd_users_emp (employee_id text primary key, password_hash text not null, created_at timestamptz not null default now())`,
       );
+      await p.query(`alter table rasd_users_emp add column if not exists role text not null default 'auditor'`);
       return p;
     })());
+  const toUser = (r: any): User => ({
+    employeeId: r.employee_id,
+    passwordHash: r.password_hash,
+    createdAt: new Date(r.created_at).toISOString(),
+    role: isRole(r.role) ? r.role : "auditor",
+  });
   return {
     get: async (employeeId) => {
       const r = await (await getPool()).query("select * from rasd_users_emp where employee_id=$1", [employeeId]);
-      return r.rows[0]
-        ? { employeeId, passwordHash: r.rows[0].password_hash, createdAt: new Date(r.rows[0].created_at).toISOString() }
-        : null;
+      return r.rows[0] ? toUser(r.rows[0]) : null;
     },
+    setRole: async (employeeId, role) => {
+      const r = await (await getPool()).query("update rasd_users_emp set role=$2 where employee_id=$1", [employeeId, role]);
+      return r.rowCount === 1;
+    },
+    list: async () => (await (await getPool()).query("select * from rasd_users_emp order by created_at")).rows.map(toUser),
     create: async (u) => {
       const r = await (await getPool()).query(
         "insert into rasd_users_emp(employee_id,password_hash) values($1,$2) on conflict (employee_id) do nothing",
@@ -160,14 +182,45 @@ const cookieHeader = (value: string, maxAge: number, req: Request) => {
 const readCookie = (req: Request) =>
   (req.headers.get("cookie") ?? "").split(/;\s*/).find((c) => c.startsWith(COOKIE + "="))?.slice(COOKIE.length + 1);
 
-export async function currentUser(req: Request): Promise<{ employeeId: string } | null> {
+export type SessionUser = { employeeId: string; role: Role };
+
+/** المستخدم الحالي من ملف تعريف الارتباط الموقَّع، والدور يُقرأ من الخادم (يسري تغييره فورًا ويسقط حذف الحساب الجلسة). */
+export async function currentUser(req: Request): Promise<SessionUser | null> {
   const s = await unsign<{ e: string; exp: number }>(readCookie(req));
-  return s ? { employeeId: s.e } : null;
+  if (!s) return null;
+  const user = await store().get(s.e);
+  return user ? { employeeId: user.employeeId, role: effectiveRole(user) } : null;
 }
 
+const MAX_LIST = 500;
+
 export async function handleGet(req: Request) {
-  return json(200, { user: await currentUser(req) });
+  const user = await currentUser(req);
+  const url = new URL(req.url);
+
+  // سجل التدقيق: للمراجع والمدير فقط، مع التحقق من سلامة السلسلة كاملة
+  if (url.searchParams.get("audit") === "1") {
+    if (!user) return json(401, { error: "unauthenticated" });
+    if (!can(user.role, "audit.read")) return json(403, { error: "forbidden" });
+    const all = await auditStore().all();
+    const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 200, 1), MAX_LIST);
+    await logEvent({ actor: user.employeeId, role: user.role, action: "audit.read", detail: `limit=${limit}` });
+    return json(200, { verify: verifyChain(all), total: all.length, events: all.slice(-limit).reverse() });
+  }
+  if (url.searchParams.get("users") === "1") {
+    if (!user) return json(401, { error: "unauthenticated" });
+    if (!can(user.role, "users.manage")) return json(403, { error: "forbidden" });
+    const users = (await store().list()).map((u) => ({ employeeId: u.employeeId, role: effectiveRole(u), createdAt: u.createdAt }));
+    return json(200, { users });
+  }
+  return json(200, { user, registration: registrationPolicy() });
 }
+
+const safeEq = (a: string, b: string) => {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+};
 
 export async function handlePost(req: Request) {
   let body: any;
@@ -177,7 +230,40 @@ export async function handlePost(req: Request) {
     return json(400, { error: "bad_request" });
   }
 
-  if (body.action === "logout") return json(200, { ok: true }, { "set-cookie": cookieHeader("", 0, req) });
+  if (body.action === "logout") {
+    const u = await currentUser(req);
+    if (u) await logEvent({ actor: u.employeeId, role: u.role, action: "auth.logout" });
+    return json(200, { ok: true }, { "set-cookie": cookieHeader("", 0, req) });
+  }
+
+  // حدث من الواجهة (قرار مدقق ذو أثر): يُختم باسم الجلسة ودورها، لا باسم يرسله المتصفح
+  if (body.action === "event") {
+    const u = await currentUser(req);
+    if (!u) return json(401, { error: "unauthenticated" });
+    if (!can(u.role, "events.write")) return json(403, { error: "forbidden" });
+    if (!isClientEvent(body.event)) return json(400, { error: "unknown_event" });
+    await logEvent({
+      actor: u.employeeId,
+      role: u.role,
+      action: String(body.event),
+      target: String(body.target ?? ""),
+      detail: String(body.detail ?? ""),
+    });
+    return json(200, { ok: true });
+  }
+
+  // تغيير دور مستخدم: للمدير فقط، ويُسجَّل
+  if (body.action === "set-role") {
+    const u = await currentUser(req);
+    if (!u) return json(401, { error: "unauthenticated" });
+    if (!can(u.role, "users.manage")) return json(403, { error: "forbidden" });
+    const target = normId(body.employeeId);
+    if (!isRole(body.role) || !ID_RE.test(target)) return json(400, { error: "bad_request" });
+    if (target === u.employeeId && body.role !== "admin") return json(400, { error: "cannot_demote_self" });
+    if (!(await store().setRole(target, body.role))) return json(404, { error: "not_found" });
+    await logEvent({ actor: u.employeeId, role: u.role, action: "users.set_role", target, detail: `role=${body.role}` });
+    return json(200, { ok: true });
+  }
 
   if (body.action === "register" || body.action === "login") {
     const employeeId = normId(body.employeeId);
@@ -186,24 +272,46 @@ export async function handlePost(req: Request) {
     if (password.length < 8 || password.length > 200) return json(400, { error: "weak_password" });
     const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
     const keys = [`id:${employeeId}`, `ip:${ip}`];
-    if (keys.some(locked)) return json(429, { error: "too_many_attempts" });
+    if (keys.some(locked)) {
+      await logEvent({ actor: employeeId, action: "auth.locked", detail: `ip=${ip}` });
+      return json(429, { error: "too_many_attempts" });
+    }
 
+    let created: User | null = null;
     if (body.action === "register") {
+      const policy = registrationPolicy();
+      if (policy === "closed") return json(403, { error: "registration_closed" });
+      if (policy === "invite") {
+        const code = String(process.env["AUTH_INVITE_CODE"] ?? "");
+        if (!code || !safeEq(String(body.inviteCode ?? ""), code)) {
+          keys.forEach(noteFail);
+          await logEvent({ actor: employeeId, action: "auth.register_denied", detail: `ip=${ip}` });
+          return json(403, { error: "invite_required" });
+        }
+      }
       if (password !== String(body.confirm ?? "")) return json(400, { error: "mismatch" });
       if (await store().get(employeeId)) return json(409, { error: "exists" });
       const passwordHash = await hashPassword(password);
-      if (!(await store().create({ employeeId, passwordHash, createdAt: new Date().toISOString() })))
-        return json(409, { error: "exists" });
+      created = { employeeId, passwordHash, createdAt: new Date().toISOString(), role: "auditor" };
+      if (!(await store().create(created))) return json(409, { error: "exists" });
+      await logEvent({ actor: employeeId, role: effectiveRole(created), action: "auth.register", detail: `ip=${ip}` });
     } else {
       const user = await store().get(employeeId);
       if (!user || !(await checkPassword(password, user.passwordHash))) {
         keys.forEach(noteFail);
+        await logEvent({ actor: employeeId, action: "auth.login_failed", detail: `ip=${ip}` });
         return json(401, { error: "wrong_credentials" });
       }
+      created = user;
+      await logEvent({ actor: employeeId, role: effectiveRole(user), action: "auth.login", detail: `ip=${ip}` });
     }
     keys.forEach((k) => fails.delete(k));
     const session = await sign({ e: employeeId, exp: Date.now() + SESSION_MS });
-    return json(200, { user: { employeeId }, mode: body.action }, { "set-cookie": cookieHeader(session, SESSION_MS / 1000, req) });
+    return json(
+      200,
+      { user: { employeeId, role: effectiveRole(created) }, mode: body.action },
+      { "set-cookie": cookieHeader(session, SESSION_MS / 1000, req) },
+    );
   }
   return json(400, { error: "bad_request" });
 }

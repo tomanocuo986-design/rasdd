@@ -7,6 +7,10 @@ import audit_engine as eng
 
 st.set_page_config(page_title="سند | وكيل التدقيق الذكي الشامل", page_icon="🏛️", layout="wide")
 st.title("🏛️ منصة سند للتدقيق المبني على المخاطر")
+st.warning(
+    "نسخة Streamlit القديمة تغطي جزءًا فقط من اختبارات منصة «رصد» (الواجهة الرئيسية). "
+    "المرجع المعتمد للنتائج هو محرك الواجهة (src/rasd/workspace.jsx)؛ راجع docs/ENGINE.ar.md."
+)
 st.markdown("نظام محلي (Offline): كل الأرقام والملاحظات تُحسب مباشرة من ملف Excel المرفوع، ولا توجد قيم ثابتة.")
 
 st.sidebar.header("📁 ملفات وإعدادات التدقيق")

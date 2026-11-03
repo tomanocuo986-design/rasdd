@@ -140,3 +140,15 @@
 @keyframes auth-glow{50%{box-shadow:0 24px 70px rgb(0 0 0/.16),0 0 0 4px color-mix(in oklab,var(--primary) 25%,transparent)}}
 .auth-orb-1{animation-duration:9s}.auth-orb-2{animation-duration:11s}
 @media (prefers-reduced-motion:reduce){.auth-screen *,.auth-screen{animation:none!important;transition:none!important}}
+
+.rasd-ai-sources{margin-top:.5rem;font-size:.75rem;opacity:.85;border-top:1px dashed currentColor;padding-top:.35rem}.rasd-ai-sources summary{cursor:pointer}.rasd-ai-sources ul{margin:.3rem 0 0;padding-inline-start:1.1rem}
+
+/* وكيل رصد: خطوات الأدوات وبطاقة الموافقة */
+.rasd-ai-agent-toggle{display:flex;align-items:center;gap:.4rem;font-size:.75rem;color:var(--muted-foreground);padding:.1rem .1rem}
+.rasd-ai-tools{margin:0 0 .5rem;padding:0;list-style:none;font-size:.75rem;display:flex;flex-direction:column;gap:.2rem}
+.rasd-ai-tool{display:flex;gap:.4rem;align-items:baseline;opacity:.9}
+.rasd-ai-tool[data-status="error"],.rasd-ai-tool[data-status="denied"]{color:var(--destructive,#c0392b)}
+.rasd-ai-approve{border:1px solid var(--primary);border-radius:.7rem;padding:.6rem .7rem;font-size:.8rem;background:var(--card);display:flex;flex-direction:column;gap:.5rem}
+.rasd-ai-approve-actions{display:flex;gap:.5rem}
+.rasd-ai-approve-actions button{border-radius:.5rem;padding:.35rem .8rem;font-size:.8rem;border:1px solid var(--border);background:var(--card);color:var(--foreground)}
+.rasd-ai-approve-actions button[data-primary]{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary)}

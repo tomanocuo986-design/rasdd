@@ -1,4 +1,5 @@
 // حالة السند القانوني لكل ملاحظة + تأكيدات المدقق + الربط اليدوي بمواد المكتبة + حداثة ملفات المكتبة.
+import { trackEvent } from "./audit-trail.js";
 import type { Observation } from "./observations";
 
 export type BasisStatus = "library" | "framework" | "none";
@@ -51,6 +52,7 @@ export function recordOverrides(
   } catch {
     /* storage full */
   }
+  if (storage === ls() && list.length) trackEvent("ui.legal.override", list.map((o) => o.id).join(",").slice(0, 280), `${action}; n=${list.length}`);
   return next;
 }
 

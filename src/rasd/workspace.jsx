@@ -1,5 +1,6 @@
 // @ts-nocheck
 /* eslint-disable */
+import { trackEvent } from "./audit-trail.js";
 import * as import_react from "react";
 import * as import_jsx_runtime from "react/jsx-runtime";
 import {
@@ -4686,6 +4687,15 @@ function SectorAudit({ auditTab }) {
   const [approvedObs, setApprovedObs] = (0, import_react.useState)(() => loadIds("approved"));
   const [deletedObs, setDeletedObs] = (0, import_react.useState)(() => loadIds("deleted"));
   const [reviewLog, setReviewLog] = (0, import_react.useState)(() => loadReviewLog());
+  (0, import_react.useEffect)(() => {
+    // وكيل المساعد قد يسجّل قرارًا خارج هذه الحالة؛ نعيد القراءة من التخزين عند إشعاره
+    const reload = () => {
+      setReviewLog(loadReviewLog());
+      setDeletedObs(loadIds("deleted"));
+    };
+    window.addEventListener("rasd-agent-write", reload);
+    return () => window.removeEventListener("rasd-agent-write", reload);
+  }, []);
   const [reviewThreshold, setReviewThreshold] = (0, import_react.useState)(() => loadThreshold());
   const allObservations = (0, import_react.useMemo)(
     () =>
@@ -4749,7 +4759,7 @@ function SectorAudit({ auditTab }) {
   }, [reviewLog, sectorObservations]);
   const decideObservation = (o, decision, note = "") => {
     const isFp = decision === "false_positive";
-    const nl = recordDecision(reviewLog, {
+    const nl = recordDecision(loadReviewLog(), {
       dataset: o.dataset,
       test: o.test,
       ref: o.id,
@@ -4760,8 +4770,9 @@ function SectorAudit({ auditTab }) {
     });
     saveReviewLog(nl);
     setReviewLog(nl);
+    trackEvent(isFp ? "ui.finding.false_positive" : "ui.finding.confirm", o.id, `${o.dataset}|${o.test}`);
     if (isFp) {
-      const n = new Set(deletedObs).add(o.id);
+      const n = new Set(loadIds("deleted")).add(o.id);
       saveIds("deleted", n);
       setDeletedObs(n);
     }

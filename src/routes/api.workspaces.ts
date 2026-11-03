@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { logEvent } from "../server/audit-log.ts";
 import { loadKeyRing } from "../server/field-crypto.ts";
 import { handleWorkspaces, memoryRepo, parseTokens, type Deps, type Repo } from "../server/workspaces.ts";
 
@@ -25,6 +26,7 @@ async function deps(): Promise<Deps | { error: string }> {
     ring,
     tokens,
     maxPayloadBytes: Number(process.env["RASD_MAX_PAYLOAD_MB"] ?? 25) * 1024 * 1024,
+    audit: (e) => void logEvent({ ...e, role: "sync-token" }),
   };
   return cached;
 }
