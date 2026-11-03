@@ -10,7 +10,7 @@ interface Props {
   sevLabel: Record<Severity | "none", string>;
 }
 
-const bar = { background: "#D9D9D9", padding: "4px 8px", fontWeight: 700 } as const;
+const bar = { background: "#D9D9D9", color: "#000", padding: "4px 8px", fontWeight: 700 } as const;
 
 /** معاينة «نموذج التقرير الرقابي» (قالب ديوان المحاسبة): قائمة الملاحظات ثم الملاحظات المفصلة كما تُصدَّر إلى Word. */
 export function ReportModelPreview({ observations, sevLabel }: Props) {
