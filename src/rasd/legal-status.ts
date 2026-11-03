@@ -2,11 +2,12 @@
 import { trackEvent } from "./audit-trail.js";
 import type { Observation } from "./observations";
 
-export type BasisStatus = "library" | "framework" | "none";
+export type BasisStatus = "library" | "framework" | "auditor" | "none";
 
 export const STATUS_LABEL: Record<BasisStatus, string> = {
   library: "سند من المكتبة",
   framework: "سند مدمج - يحتاج تحقق",
+  auditor: "سند أدخله المدقق",
   none: "بلا سند",
 };
 
@@ -15,7 +16,7 @@ const ls = (): Storage | undefined => (typeof localStorage === "undefined" ? und
 
 export function basisStatus(o: Pick<Observation, "legalBasis">): BasisStatus {
   const s = o.legalBasis?.source;
-  return s === "library" ? "library" : s === "framework" ? "framework" : "none";
+  return s === "library" ? "library" : s === "framework" ? "framework" : s === "auditor" ? "auditor" : "none";
 }
 
 // ---------- تأكيدات المدقق (اعتماد/تصدير بلا سند من المكتبة) ----------
@@ -59,7 +60,8 @@ export function recordOverrides(
 /** تحتاج تأكيدًا صريحًا: السند ليس من المكتبة ولم يسبق تأكيد الملاحظة بنفس حالة السند. */
 export function needsConfirmation(o: Pick<Observation, "id" | "legalBasis">, overrides: Override[]): boolean {
   const st = basisStatus(o);
-  return st !== "library" && !overrides.some((x) => x.id === o.id && x.status === st);
+  // سند كتبه المدقق بنفسه عند التعديل: مسؤوليته عليه فلا يحتاج تأكيدًا إضافيًا
+  return st !== "library" && st !== "auditor" && !overrides.some((x) => x.id === o.id && x.status === st);
 }
 
 // ---------- الربط اليدوي: اختبار => مادة في ملف من المكتبة ----------

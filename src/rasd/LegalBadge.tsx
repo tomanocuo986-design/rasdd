@@ -4,6 +4,7 @@ import type { Observation } from "./observations";
 const CLASS = {
   library: "text-success",
   framework: "text-warning",
+  auditor: "text-success",
   none: "text-danger",
 } as const;
 

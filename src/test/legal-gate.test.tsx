@@ -2,7 +2,7 @@ import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuditReport } from "@/rasd/AuditReport";
-import { draftObservations, loadIds, saveDraft } from "@/rasd/observations";
+import { draftObservations, loadIds, saveDraft, saveIds } from "@/rasd/observations";
 import { loadOverrides } from "@/rasd/legal-status";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -56,7 +56,9 @@ describe("legal basis gate", () => {
 
   it("asks for explicit confirmation before exporting without a library basis, and logs it", async () => {
     const onExport = vi.fn(async () => {});
-    saveDraft({ date: "2026-11-02", observations: draftObservations([finding()]) });
+    const obs = draftObservations([finding()]);
+    saveDraft({ date: "2026-11-02", observations: obs });
+    saveIds("approved", new Set(obs.map((o) => o.id))); // الملاحظة الجديدة لا تُصدَّر قبل اعتماد المدقق
     const { el } = await mount(<AuditReport {...baseProps(onExport)} />);
     await clickText(el, "تصدير التقرير PDF");
     expect(onExport).not.toHaveBeenCalled();
@@ -70,7 +72,9 @@ describe("legal basis gate", () => {
   it("exports directly when every observation has a library basis", async () => {
     const onExport = vi.fn(async () => {});
     const withReg = finding({ regulation: { doc: "نظام المشتريات", excerpt: "المادة 5: يحظر تجزئة المشتريات" } });
-    saveDraft({ date: "2026-11-02", observations: draftObservations([withReg]) });
+    const obs = draftObservations([withReg]);
+    saveDraft({ date: "2026-11-02", observations: obs });
+    saveIds("approved", new Set(obs.map((o) => o.id)));
     const { el } = await mount(<AuditReport {...baseProps(onExport)} />);
     expect(el.querySelector('[data-testid="legal-badge"]')?.getAttribute("data-status")).toBe("library");
     await clickText(el, "تصدير التقرير PDF");

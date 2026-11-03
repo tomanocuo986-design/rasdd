@@ -42,16 +42,22 @@ import { calibrateSeverity, impactAmount, defaultCalibration, loadCalibration, s
 import { buildHistoryIndex, classifyFindings, resolvedFindings, historySummary, findingsFromRows, reportFromJson, extractRecommendations, STATUS_LABEL } from "./history";
 import { partitionRecords, rejectionMessage, rejectedToCsv, missingRequired } from "./validation";
 import {
+  applyEdit,
+  applyEdits,
   currentObservations,
+  diffEdit,
   draftObservations,
+  loadEdits,
   loadIds,
   observationLines,
   saveDraft,
+  saveEdits,
   saveIds,
   summarize,
   summaryText,
 } from "./observations";
 import { AuditReport } from "./AuditReport";
+import { buildReportDocx, fetchTemplate } from "./report-docx";
 import { ObservationsPanel } from "./ObservationsPanel";
 import { ReviewStatsPanel } from "./ReviewStatsPanel";
 import { LegalCoveragePanel } from "./LegalCoveragePanel";
@@ -4366,6 +4372,21 @@ async function downloadReportPdf(report, datasetLabel) {
   }
   doc.save(`${report.name}.pdf`);
 }
+async function downloadReportDocx(report, meta) {
+  // يُبنى الملف على قالب ديوان المحاسبة نفسه؛ الملاحظات المعتمدة فقط تصل هنا (انظر AuditReport)
+  const bytes = await buildReportDocx(await fetchTemplate(), report, meta);
+  const blob = new Blob([bytes], {
+    type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${report.name}.docx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 function parseReportText(text) {
   const out = [];
   const sevOf = (s) =>
@@ -4686,6 +4707,8 @@ function SectorAudit({ auditTab }) {
   const repeated = sectorFindings.filter((f) => f.repeat).length;
   const [approvedObs, setApprovedObs] = (0, import_react.useState)(() => loadIds("approved"));
   const [deletedObs, setDeletedObs] = (0, import_react.useState)(() => loadIds("deleted"));
+  // تعديلات المدقق على صياغة الملاحظات المصاغة آلياً (تبقى بعد إعادة التحليل لأنها مفتاحها معرّف الملاحظة)
+  const [obsEdits, setObsEdits] = (0, import_react.useState)(() => loadEdits());
   const [reviewLog, setReviewLog] = (0, import_react.useState)(() => loadReviewLog());
   (0, import_react.useEffect)(() => {
     // وكيل المساعد قد يسجّل قرارًا خارج هذه الحالة؛ نعيد القراءة من التخزين عند إشعاره
@@ -4697,7 +4720,7 @@ function SectorAudit({ auditTab }) {
     return () => window.removeEventListener("rasd-agent-write", reload);
   }, []);
   const [reviewThreshold, setReviewThreshold] = (0, import_react.useState)(() => loadThreshold());
-  const allObservations = (0, import_react.useMemo)(
+  const rawObservations = (0, import_react.useMemo)(
     () =>
       auditSectors.flatMap((s) =>
         draftObservations(
@@ -4714,6 +4737,10 @@ function SectorAudit({ auditTab }) {
       ),
     [findings, store, approvedObs],
   );
+  const allObservations = (0, import_react.useMemo)(
+    () => applyEdits(rawObservations, obsEdits),
+    [rawObservations, obsEdits],
+  );
   // ملاحظات كتبها المدقق واعتمدها نهائيًا من المساعد («مسودة مدقق»): تُدمج مع ملاحظات المحرك
   const manualObs = useManualObservations();
   (0, import_react.useEffect)(() => {
@@ -4725,7 +4752,7 @@ function SectorAudit({ auditTab }) {
         ...allObservations.filter((o) => o.sector === sectorKey),
         ...manualObs
           .filter((o) => o.sector === sectorKey)
-          .map((o) => ({ ...o, status: approvedObs.has(o.id) ? "approved" : "draft" })),
+          .map((o) => applyEdit({ ...o, status: approvedObs.has(o.id) ? "approved" : "draft" }, obsEdits[o.id])),
       ].sort((a, b) => b.risk.score - a.risk.score || b.count - a.count),
     [allObservations, sectorKey, manualObs, approvedObs],
   );
@@ -4782,10 +4809,24 @@ function SectorAudit({ auditTab }) {
     if (comp.total > 0)
       saveDraft({
         date: new Date().toISOString().slice(0, 10),
-        observations: allObservations,
+        // الصياغة الأصلية دون تعديلات المدقق؛ تُطبَّق التعديلات عند الدمج كي لا تضيع المقارنة بالأصل
+        observations: rawObservations,
         compliance: comp,
       });
-  }, [allObservations]);
+  }, [rawObservations]);
+  // تعديل المدقق لصياغة ملاحظة (الحالة/السند/السبب/الأثر/التوصية/التصنيف) مع خيار الاعتماد الفوري
+  const editObservation = (o, patch, approve) => {
+    // نقارن بالمسودة الأصلية (قبل أي تعديل سابق) كي لا يُخزَّن إلا ما يخالفها فعلاً
+    const original = rawObservations.find((x) => x.id === o.id) ?? manualObs.find((x) => x.id === o.id) ?? o;
+    const e = diffEdit(original, patch);
+    const n = { ...obsEdits };
+    if (e) n[o.id] = e;
+    else delete n[o.id];
+    saveEdits(n);
+    setObsEdits(n);
+    trackEvent("ui.finding.edit", o.id, `${o.dataset}|${o.test}`);
+    if (approve && !approvedObs.has(o.id)) toggleApprove(o.id);
+  };
   const toggleApprove = (id) => {
     const n = new Set(approvedObs);
     n.has(id) ? n.delete(id) : n.add(id);
@@ -6160,6 +6201,7 @@ function SectorAudit({ auditTab }) {
         },
         decisions: obsDecisions,
         onDecide: decideObservation,
+        onEdit: editObservation,
       }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LegalCoveragePanel, {
         observations,
@@ -7571,6 +7613,7 @@ function Workspace() {
                               datasetLabel,
                               loadSaved: loadReports,
                               onExportPdf: (r) => downloadReportPdf(r, datasetLabel),
+                              onExportDocx: (r, meta) => downloadReportDocx(r, meta),
                             }),
                           view === "reports" &&
                             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(

@@ -30,7 +30,7 @@ export interface RiskAssessment {
 }
 
 export interface LegalBasis {
-  source: "library" | "framework" | "default";
+  source: "library" | "framework" | "default" | "auditor";
   text: string;
   /** kept for compatibility; always false now that the basis is taken only from uploaded files */
   needsVerification: boolean;
@@ -53,6 +53,10 @@ export interface Observation {
   status: "draft" | "approved";
   /** true when the auditor wrote the observation by hand in the assistant (not produced by the audit engine) */
   manual?: boolean;
+  /** true when no finding of this observation appeared in any previous report: it is drafted by the program and waits for the auditor's decision */
+  isNew?: boolean;
+  /** true when the auditor edited the drafted wording (see ObsEdit) */
+  edited?: boolean;
 }
 
 interface Rule {
@@ -174,6 +178,14 @@ export const DEFAULT_CAUSE = "ضعف الضوابط الرقابية المسب�
 export const DEFAULT_EFFECT = "مخاطر مالية وإدارية محتملة تستوجب المراجعة والتصويب.";
 export const DEFAULT_REC = "مراجعة الحالات المرصودة مع الإدارة المعنية ومعالجة السبب الجذري.";
 
+/** New observations with no matching rule: wording built from the test title and the table instead of one generic sentence. */
+export function contextualCause(test: string, datasetLabel: string): string {
+  return `عدم كفاية الضوابط الرقابية المسبقة والمطابقة الدورية على «${test}» في ${datasetLabel}، وعدم وجود إجراء يمنع تكرار هذه الحالة أو يكشفها فور حدوثها.`;
+}
+export function contextualEffect(test: string, count: number): string {
+  return `استمرار ${count > 1 ? `${count} حالات` : "حالة"} من «${test}» دون معالجة، مع مخاطر مالية وإدارية محتملة وصعوبة في المساءلة وتتبع المسؤولية.`;
+}
+
 /** Cause / effect / recommendation wording for a test title (same rules the audit engine uses). */
 export function ruleFor(test: string): { cause: string; effect: string; recommendation: string } {
   const r = RULES.find((x) => x.match.test(test));
@@ -255,11 +267,12 @@ export function draftObservations(findings: AuditFinding[], opts: DraftOptions =
       repeated: group.filter((f) => f.repeat !== undefined).length,
       risk: assessRisk(group, opts.totalRecords ?? 0),
       condition: conditionOf(group, first.test, label(first.dataset), refs),
-      cause: rule?.cause ?? DEFAULT_CAUSE,
+      cause: rule?.cause ?? contextualCause(first.test, label(first.dataset)),
       legalBasis: legalBasisOf(group),
-      effect: rule?.effect ?? DEFAULT_EFFECT,
+      effect: rule?.effect ?? contextualEffect(first.test, group.length),
       recommendation: rule?.recommendation ?? DEFAULT_REC,
       status: opts.approved?.has(id) ? "approved" : "draft",
+      isNew: group.every((f) => f.repeat === undefined),
     });
   });
   return out.sort((a, b) => b.risk.score - a.risk.score || b.count - a.count);
@@ -342,9 +355,80 @@ export function saveIds(kind: keyof typeof IDS_KEY, ids: ReadonlySet<string>): v
   }
 }
 
+/** Wording the auditor changed on a drafted observation; keyed by observation id so it survives re-running the analysis. */
+export interface ObsEdit {
+  test?: string;
+  condition?: string;
+  legalBasis?: string;
+  cause?: string;
+  effect?: string;
+  recommendation?: string;
+  rating?: Severity;
+  at?: string;
+}
+const EDITS_KEY = "rasd-obs-edits";
+
+export function loadEdits(): Record<string, ObsEdit> {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(EDITS_KEY) ?? "{}");
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, ObsEdit>) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveEdits(e: Record<string, ObsEdit>): void {
+  try {
+    localStorage.setItem(EDITS_KEY, JSON.stringify(e));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+/** Keeps only the fields the auditor really changed (trimmed, non-empty); returns undefined when nothing differs from the draft. */
+export function diffEdit(o: Observation, v: ObsEdit, now = new Date()): ObsEdit | undefined {
+  const out: ObsEdit = {};
+  const t = (x?: string) => (x ?? "").trim();
+  if (t(v.test) && t(v.test) !== o.test) out.test = t(v.test);
+  if (t(v.condition) && t(v.condition) !== o.condition) out.condition = t(v.condition);
+  if (t(v.legalBasis) && t(v.legalBasis) !== o.legalBasis.text) out.legalBasis = t(v.legalBasis);
+  if (t(v.cause) && t(v.cause) !== o.cause) out.cause = t(v.cause);
+  if (t(v.effect) && t(v.effect) !== o.effect) out.effect = t(v.effect);
+  if (t(v.recommendation) && t(v.recommendation) !== o.recommendation) out.recommendation = t(v.recommendation);
+  if (v.rating && v.rating !== o.risk.rating) out.rating = v.rating;
+  return Object.keys(out).length ? { ...out, at: now.toISOString() } : undefined;
+}
+
+export function applyEdit(o: Observation, e: ObsEdit | undefined): Observation {
+  if (!e) return o;
+  const risk = e.rating ? { ...o.risk, rating: e.rating, rationale: `${o.risk.rationale} (التصنيف عدّله المدقق)` } : o.risk;
+  return {
+    ...o,
+    test: e.test ?? o.test,
+    condition: e.condition ?? o.condition,
+    cause: e.cause ?? o.cause,
+    effect: e.effect ?? o.effect,
+    recommendation: e.recommendation ?? o.recommendation,
+    // a basis typed by the auditor is his own responsibility: it is labelled as such, never as a library basis
+    legalBasis: e.legalBasis ? { source: "auditor", text: e.legalBasis, needsVerification: false } : o.legalBasis,
+    risk,
+    edited: true,
+  };
+}
+
+export function applyEdits(list: Observation[], edits: Record<string, ObsEdit>): Observation[] {
+  return list.map((o) => applyEdit(o, edits[o.id]));
+}
+
+/**
+ * What reaches the report files (PDF / Word): a new observation (not in any previous report) only after the auditor approved it;
+ * observations already present in previous reports and the ones the auditor wrote himself keep flowing as before.
+ */
+export const reportable = (list: Observation[]): Observation[] => list.filter((o) => !o.isNew || o.status === "approved");
+
 export function clearDrafts(): void {
   try {
-    [DRAFT_KEY, IDS_KEY.deleted, IDS_KEY.approved].forEach((k) => localStorage.removeItem(k));
+    [DRAFT_KEY, IDS_KEY.deleted, IDS_KEY.approved, EDITS_KEY].forEach((k) => localStorage.removeItem(k));
   } catch {
     /* storage unavailable */
   }
@@ -355,13 +439,14 @@ export function mergeObservations(
   lists: Observation[][],
   deleted: ReadonlySet<string>,
   approved: ReadonlySet<string>,
+  edits: Record<string, ObsEdit> = {},
 ): Observation[] {
   const seen = new Set<string>();
   const out: Observation[] = [];
   for (const o of lists.flat()) {
     if (seen.has(o.id) || deleted.has(o.id)) continue;
     seen.add(o.id);
-    out.push({ ...o, status: approved.has(o.id) ? "approved" : "draft" });
+    out.push(applyEdit({ ...o, status: approved.has(o.id) ? "approved" : "draft" }, edits[o.id]));
   }
   return out.sort((a, b) => b.risk.score - a.risk.score || b.count - a.count);
 }
@@ -371,6 +456,7 @@ export function currentObservations(): Observation[] {
     [loadDraft()?.observations ?? []],
     loadIds("deleted"),
     loadIds("approved"),
+    loadEdits(),
   );
 }
 
@@ -382,6 +468,8 @@ export interface ReportSummary {
   approved: number;
   repeated: number;
   datasets: number;
+  /** new observations (not in previous reports) still waiting for the auditor's decision */
+  pendingNew: number;
 }
 
 export function summarize(list: Observation[]): ReportSummary {
@@ -394,6 +482,7 @@ export function summarize(list: Observation[]): ReportSummary {
     approved: list.filter((o) => o.status === "approved").length,
     repeated: list.filter((o) => o.repeated > 0).length,
     datasets: new Set(list.map((o) => o.dataset)).size,
+    pendingNew: list.filter((o) => o.isNew && o.status !== "approved").length,
   };
 }
 
