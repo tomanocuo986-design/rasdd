@@ -303,7 +303,7 @@ const SCORE = { high: 6, medium: 3, low: 1 };
 const LEVEL = { high: 3, medium: 2, low: 1 };
 
 /** يحوّل المسودة المعتمدة إلى ملاحظة رقابية بنفس بنية ملاحظات المحرك. */
-export function buildObservation({ title, text, sector = "", severity, cause, effect, recommendation, analysis }) {
+export function buildObservation({ title, text, sector = "", severity, cause, effect, recommendation, analysis, legalBasis, isNew }) {
   const t = (title || deriveTitle(text)).trim();
   const rule = ruleFor(t || text);
   const best = analysis?.comparison?.matches?.[0];
@@ -328,12 +328,16 @@ export function buildObservation({ title, text, sector = "", severity, cause, ef
     condition: String(text).trim(),
     cause: cause?.trim() || rule.cause,
     effect: effect?.trim() || rule.effect,
-    legalBasis: prevBasis
-      ? { source: prevBasis.source, text: prevBasis.text, needsVerification: !!prevBasis.needsVerification }
-      : { source: "default", text: NO_BASIS_TEXT, needsVerification: false },
+    // سند مقترح من مكتبة الأنظمة (أو كتبه المدقق) يتقدم على سند ملاحظة سابقة مشابهة
+    legalBasis: legalBasis?.text?.trim()
+      ? { source: legalBasis.source ?? "auditor", text: legalBasis.text.trim(), needsVerification: !!legalBasis.needsVerification }
+      : prevBasis
+        ? { source: prevBasis.source, text: prevBasis.text, needsVerification: !!prevBasis.needsVerification }
+        : { source: "default", text: NO_BASIS_TEXT, needsVerification: false },
     recommendation: recommendation?.trim() || best?.recommendation || rule.recommendation,
     status: "approved",
     manual: true,
+    ...(isNew ? { isNew: true } : {}),
   };
 }
 

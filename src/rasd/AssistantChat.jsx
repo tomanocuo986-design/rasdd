@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { allDatasets, auditSectors, runAudit } from "./workspace.jsx";
 import { AuditorDraft } from "./AuditorDraft.jsx";
+import { DraftCard } from "./DraftCard.jsx";
+import { isObservationText } from "./chat-draft.js";
 import { listRegulations } from "./regulations-db.js";
 import { buildQuery, retrievePassages, toPayload } from "./legal-retrieval.js";
 import { makeToolbox } from "./agent-wiring.js";
@@ -13,6 +15,9 @@ import {
   serializeAssistantContext,
   subscribeAssistantContext,
 } from "./assistant-context.js";
+
+const DRAFT_NOTE =
+  "حوّلتُ وصفك إلى مسودة ملاحظة رقابية (الحالة، السند القانوني، السبب، الأثر، التوصية) مع تصنيفها. هي بانتظار قرارك: اعتماد أو تعديل أو حذف، ولا تدخل التقرير قبل الاعتماد.";
 
 const SUGGESTIONS = [
   "لخّص لي وضع بياناتي الحالي",
@@ -36,6 +41,7 @@ export function AssistantChat() {
     }
   });
   const [approval, setApproval] = useState(null); // { description, resolve }
+  const [draftMode, setDraftMode] = useState(false); // الرسالة التالية وصف ملاحظة رقابية تُصاغ وتُعرض للاعتماد
   const abortRef = useRef(null);
   const endRef = useRef(null);
   const ctx = useSyncExternalStore(subscribeAssistantContext, getAssistantContext, () => null);
@@ -107,7 +113,7 @@ export function AssistantChat() {
   // ما يفعله المساعد الآن: يتغير النص حسب نوع الطلب ومدة الانتظار
   const waiting = busy && !messages[messages.length - 1]?.content;
   const waitLabel = usePhaseLabel(CHAT_PHASES[curMode] ?? CHAT_PHASES.chat, waiting);
-  const lastReply = [...messages].reverse().find((m) => m.role === "assistant" && m.content)?.content;
+  const lastReply = [...messages].reverse().find((m) => m.role === "assistant" && m.content && !m.draftFor)?.content;
 
   // إذا لم تُفتح صفحة التدقيق بعد، نقرأ بياناتك المحفوظة في المتصفح ونحللها بالقواعد الثابتة
   useEffect(() => {
@@ -127,6 +133,14 @@ export function AssistantChat() {
     const content = text.trim().slice(0, 4000);
     if (!content || busy) return;
     const history = [...messages, { role: "user", content }];
+    // وصف ملاحظة رقابية (صياغة صريحة أو عبارة «لوحظ…»): تُقارَن بالتقارير السابقة وتُصاغ محليًا وتنتظر قرار المدقق
+    if (mode === "chat" && (draftMode || isObservationText(content))) {
+      setMessages([...history, { role: "assistant", content: DRAFT_NOTE, draftFor: content }]);
+      setInput("");
+      setError("");
+      setDraftMode(false);
+      return;
+    }
     // RAG: نجلب مقاطع الأنظمة ذات الصلة من مكتبة المدقق (إن وُجدت) قبل الإرسال
     let passages = [];
     try {
@@ -240,6 +254,15 @@ export function AssistantChat() {
             <button type="button" className="rasd-ai-analyze" onClick={() => setView("draft")}>
               ✎ اكتب مسودة مدقق
             </button>
+            <button
+              type="button"
+              className="rasd-ai-analyze rasd-ai-draft-toggle"
+              aria-pressed={draftMode}
+              disabled={busy}
+              onClick={() => setDraftMode((v) => !v)}
+            >
+              {draftMode ? "✓ صياغة ملاحظة: اكتب وصفها في الأسفل" : "✎ صغ ملاحظة رقابية من وصفي"}
+            </button>
             {lastReply && !busy && (
               <button
                 type="button"
@@ -262,7 +285,7 @@ export function AssistantChat() {
               </div>
             )}
             {messages.map((m, i) => (
-              <div key={i} className={`rasd-ai-msg rasd-ai-${m.role}`}>
+              <div key={i} className={`rasd-ai-msg rasd-ai-${m.role}${m.draftFor ? " rasd-ai-msg-draft" : ""}`}>
                 {m.tools?.length > 0 && (
                   <ul className="rasd-ai-tools" aria-label="خطوات الوكيل">
                     {m.tools.map((t) => (
@@ -279,6 +302,7 @@ export function AssistantChat() {
                 {m.content && busy && i === messages.length - 1 && (
                   <ThinkingIndicator compact label="يكتب الرد…" />
                 )}
+                {m.draftFor && <DraftCard source={m.draftFor} />}
                 {m.role === "assistant" && m.content && m.sources?.length > 0 && (
                   <details className="rasd-ai-sources">
                     <summary>مصادر من مكتبة الأنظمة ({m.sources.length})</summary>
@@ -324,7 +348,7 @@ export function AssistantChat() {
               value={input}
               rows={1}
               maxLength={4000}
-              placeholder="اكتب سؤالك…"
+              placeholder={draftMode ? "صف الملاحظة كما رصدتها، مثال: لوحظ صرف مبلغ دون مستند…" : "اكتب سؤالك…"}
               aria-label="سؤالك"
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
