@@ -3,6 +3,7 @@ import { z } from "zod";
 import { currentUser } from "../server/auth.ts";
 import { logEvent } from "../server/audit-log.ts";
 import { can } from "../server/roles.ts";
+import { aiLogDetail, gateProvider, sanitizeForAI } from "../server/ai-policy.ts";
 
 import {
   geminiBody,
@@ -73,6 +74,12 @@ export const Route = createFileRoute("/api/chat")({
         const provider = providerFromEnv();
         if (!provider)
           return json(503, "المساعد غير مفعّل: اضبط LLM_BASE_URL (نموذج محلي) أو GEMINI_API_KEY على الخادم.");
+        // بوابة السرية: المزود الخارجي ممنوع ما لم يُفعَّل بقرار إداري، وكل ما يُرسل إليه يُحجب
+        const gate = gateProvider(provider);
+        if (!gate.ok) {
+          void logEvent({ actor: user.employeeId, role: user.role, action: "ai.blocked", detail: "route=chat provider=external" });
+          return json(gate.status, gate.message);
+        }
         if (limited(clientKey(request))) return json(429, "طلبات كثيرة، حاول بعد دقيقة.");
 
         let parsed;
@@ -82,16 +89,18 @@ export const Route = createFileRoute("/api/chat")({
           return json(400, "طلب غير صالح.");
         }
         if (!parsed.success) return json(400, "طلب غير صالح.");
-        const { messages, context, mode, passages } = parsed.data;
-        if (messages[messages.length - 1].role !== "user") return json(400, "طلب غير صالح.");
+        const { mode, passages } = parsed.data;
+        if (parsed.data.messages[parsed.data.messages.length - 1]!.role !== "user") return json(400, "طلب غير صالح.");
+        const safe = sanitizeForAI(parsed.data.messages, parsed.data.context, { external: gate.external });
+        const messages = safe.messages;
 
-        const system = systemFor(mode, context, passages);
+        const system = systemFor(mode, safe.context, passages);
         // نسجّل حدوث الاستخدام فقط (الوضع وعدد المقاطع)، لا نص السؤال ولا بيانات التدقيق
         void logEvent({
           actor: user.employeeId,
           role: user.role,
           action: "ai.chat",
-          detail: `mode=${mode ?? "chat"} passages=${passages?.length ?? 0}`,
+          detail: aiLogDetail(`mode=${mode ?? "chat"} passages=${passages?.length ?? 0}`, gate.external, safe.total),
         });
         const maxTokens = maxTokensFor(mode);
 

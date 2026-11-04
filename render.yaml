@@ -11,6 +11,13 @@ services:
         value: "22"
       - key: GEMINI_API_KEY
         sync: false # يُطلب منك إدخاله في لوحة Render (لا يُحفظ في GitHub)
+      # الذكاء الاصطناعي الخارجي (Gemini) ممنوع افتراضياً لحماية السرية؛ لا يعمل إلا مع AI_ALLOW_EXTERNAL=1 (قرار إداري). انظر docs/AI_CONFIDENTIALITY.ar.md
+      - key: AI_ALLOW_EXTERNAL
+        sync: false # 1 = يسمح بالمزود الخارجي مع حجب البيانات الشخصية. اتركه فارغاً لمنعه
+      - key: AI_REDACT_TERMS
+        sync: false # أسماء جهات/موردين/موظفين تُحجب دائماً قبل الإرسال، مفصولة بفواصل
+      - key: LLM_BASE_URL
+        sync: false # نموذج محلي داخل الشبكة (مثل http://ollama:11434/v1)؛ هو الخيار الموصى به
       - key: DATABASE_URL
         sync: false # مطلوب للإنتاج: حسابات المستخدمين وسجل التدقيق يُمسحان مع كل نشر بدونه
       - key: AUTH_REGISTRATION

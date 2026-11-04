@@ -164,3 +164,5 @@
 
 /* شريط الحساب: فوق شريط التنقل السفلي في الجوال حتى لا يتداخل معه */
 @media (width<=500px){.rasd-account-bar{bottom:78px!important}}
+
+.rasd-ai-privacy{font-size:11px;line-height:1.6;margin:6px 0 0;padding:6px 8px;border-radius:8px;border:1px solid var(--border);color:var(--muted-foreground)}.rasd-ai-privacy[data-level=local]{border-color:var(--success)}.rasd-ai-privacy[data-level=external]{border-color:var(--warning)}.rasd-ai-privacy[data-level=external-blocked]{border-color:var(--danger);color:var(--danger)}

@@ -25,6 +25,12 @@ const SUGGESTIONS = [
   "اشرح لي معنى القيم الشاذة",
 ];
 
+const AI_PRIVACY = {
+  local: "🔒 نموذج داخل شبكة الجهة: بيانات المحادثة لا تغادر الشبكة.",
+  external: "⚠ نموذج خارجي مُفعَّل بقرار إداري: تُحجب الأرقام الوطنية والهواتف والحسابات والأسماء بألقاب قبل الإرسال، وغير ذلك قد يصل المزود.",
+  "external-blocked": "⛔ المزود الخارجي غير مسموح افتراضيًا لحماية سرية بيانات التدقيق. اطلب من مدير النظام ضبط نموذج محلي (LLM_BASE_URL).",
+};
+
 export function AssistantChat() {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState("chat"); // chat | draft
@@ -41,6 +47,7 @@ export function AssistantChat() {
     }
   });
   const [approval, setApproval] = useState(null); // { description, resolve }
+  const [aiStatus, setAiStatus] = useState(""); // off | local | external-blocked | external (من /api/health)
   const abortRef = useRef(null);
   const endRef = useRef(null);
   const ctx = useSyncExternalStore(subscribeAssistantContext, getAssistantContext, () => null);
@@ -48,6 +55,20 @@ export function AssistantChat() {
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: "end" });
   }, [messages, open]);
+
+  // مؤشر الخصوصية: أين تذهب بيانات المحادثة (داخل الشبكة أم مزود خارجي). لا يؤثر على عمل المساعد إن فشل الطلب.
+  useEffect(() => {
+    if (!open || aiStatus || typeof fetch !== "function") return;
+    let live = true;
+    Promise.resolve()
+      .then(() => fetch("/api/health"))
+      .then((r) => r?.json?.())
+      .then((d) => live && typeof d?.ai === "string" && setAiStatus(d.ai))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [open, aiStatus]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -317,6 +338,11 @@ export function AssistantChat() {
                   </button>
                 </div>
               </div>
+            )}
+            {AI_PRIVACY[aiStatus] && (
+              <p className="rasd-ai-privacy" data-testid="ai-privacy" data-level={aiStatus}>
+                {AI_PRIVACY[aiStatus]}
+              </p>
             )}
             {error && (
               <p className="rasd-ai-error" role="alert">

@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { currentUser } from "../server/auth.ts";
 import { logEvent } from "../server/audit-log.ts";
+import { aiLogDetail, gateProvider, sanitizeForAI } from "../server/ai-policy.ts";
 import { can } from "../server/roles.ts";
+import type { AgentMessage } from "../server/agent.ts";
 import { AGENT_RULES, geminiAgentBody, openaiAgentBody, parseStep, MAX_AGENT_STEPS } from "../server/agent.ts";
 import { providerFromEnv, systemFor } from "../server/llm.ts";
 
@@ -78,6 +80,11 @@ export const Route = createFileRoute("/api/agent")({
         if (!can(user.role, "chat.use")) return fail(403, "لا تملك صلاحية استخدام المساعد.");
         const provider = providerFromEnv();
         if (!provider) return fail(503, "الوكيل غير مفعّل: اضبط LLM_BASE_URL أو GEMINI_API_KEY على الخادم.");
+        const gate = gateProvider(provider);
+        if (!gate.ok) {
+          void logEvent({ actor: user.employeeId, role: user.role, action: "ai.blocked", detail: "route=agent provider=external" });
+          return fail(gate.status, gate.message);
+        }
         if (limited(clientKey(request))) return fail(429, "طلبات كثيرة، حاول بعد دقيقة.");
 
         let parsed;
@@ -87,11 +94,14 @@ export const Route = createFileRoute("/api/agent")({
           return fail(400, "طلب غير صالح.");
         }
         if (!parsed.success) return fail(400, "طلب غير صالح.");
-        const { messages, context, passages, step } = parsed.data;
-        const last = messages[messages.length - 1]!;
+        const { passages, step } = parsed.data;
+        const last = parsed.data.messages[parsed.data.messages.length - 1]!;
         if (last.role === "assistant") return fail(400, "طلب غير صالح.");
+        // نتائج أدوات الوكيل (tool) تحمل بيانات التدقيق، فتُحجب مع الرسائل والسياق عند المزود الخارجي
+        const safe = sanitizeForAI(parsed.data.messages, parsed.data.context, { external: gate.external });
+        const messages = safe.messages as AgentMessage[];
 
-        const system = `${systemFor("chat", context, passages)}\n\n${AGENT_RULES}`;
+        const system = `${systemFor("chat", safe.context, passages)}\n\n${AGENT_RULES}`;
         const maxTokens = 2048;
 
         // نسجّل الاستخدام فقط (رقم الخطوة وأسماء الأدوات المطلوبة في هذه الرسالة الأخيرة)، لا نص ولا بيانات
@@ -99,7 +109,7 @@ export const Route = createFileRoute("/api/agent")({
           actor: user.employeeId,
           role: user.role,
           action: "ai.agent",
-          detail: `step=${step ?? 1} last=${last.role === "tool" ? last.name : "user"}`,
+          detail: aiLogDetail(`step=${step ?? 1} last=${last.role === "tool" ? last.name : "user"}`, gate.external, safe.total),
         });
 
         let data: unknown;
