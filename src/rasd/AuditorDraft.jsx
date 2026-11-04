@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { auditSectors } from "./workspace.jsx";
 import { ThinkingIndicator } from "./ThinkingIndicator.jsx";
 import { NO_BASIS_TEXT, OBS_LABELS } from "./observations";
-import { DELETE_GUIDANCE, SEVERITY_WORD, classifyObservation, compareObservation, loadCorpus } from "./auditor-draft.js";
+import { DELETE_GUIDANCE, SEVERITY_WORD, classifyObservation, compareObservationSemantic, loadCorpus } from "./auditor-draft.js";
 import { approveChatDraft, discardChatDraft, hasDefaultWording, makeChatDraft, memoFor } from "./chat-draft.js";
 import { STATUS_LABEL as BASIS_LABEL, basisStatus } from "./legal-status";
 
@@ -87,7 +87,7 @@ export function AuditorDraft() {
     );
     await sleep(600);
     if (id !== run.current) return;
-    const comparison = compareObservation(body, corpus);
+    const comparison = compareObservationSemantic(body, corpus);
     setPhase("يقدّر مستوى الخطورة (مرتفعة / متوسطة / منخفضة)…");
     await sleep(450);
     if (id !== run.current) return;
@@ -258,6 +258,11 @@ export function AuditorDraft() {
                       {m.report}
                       {m.date ? ` · ${m.date}` : ""}
                     </span>
+                    {m.semantic?.lifted && (
+                      <p className="rasd-ad-hint">
+                        مطابقة بالمعنى لا باللفظ{m.semantic.shared.length ? ` — مفاهيم مشتركة: ${m.semantic.shared.join("، ")}` : ""}
+                      </p>
+                    )}
                   </li>
                 ))}
               </ul>

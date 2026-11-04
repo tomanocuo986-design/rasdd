@@ -135,6 +135,11 @@ export function DraftCard({ source }) {
                   {m.report}
                   {m.date ? ` · ${m.date}` : ""}
                 </span>
+                {m.semantic?.lifted && (
+                  <p className="rasd-ad-hint">
+                    مطابقة بالمعنى لا باللفظ{m.semantic.shared.length ? ` — مفاهيم مشتركة: ${m.semantic.shared.join("، ")}` : ""}
+                  </p>
+                )}
                 {m.recommendation && <p className="rasd-ad-hint">التوصية السابقة: {m.recommendation}</p>}
               </li>
             ))}

@@ -12,6 +12,7 @@ import { calibrateSeverity, loadCalibration } from "./severity.js";
 import { STATUS_LABEL } from "./history.js";
 import { NO_BASIS_TEXT, ruleFor } from "./observations";
 import { getManualObservations } from "./manual-observations";
+import { blendWithLexical, buildSemanticIndex } from "./semantic-match.js";
 
 const REPORTS_KEY = "rasd-audit-reports";
 const CURRENT_KEY = "rasd-audit-current";
@@ -193,6 +194,29 @@ export function compareObservation(text, corpus, { limit = 5 } = {}) {
   };
 }
 
+/**
+ * المقارنة بالمعنى: تبدأ من النتيجة اللفظية أعلاه (compareObservation) ثم ترفع درجة ما يشبهها دلاليًا
+ * (معجم مفاهيم رقابية + LSA مُتعلَّم من التقارير نفسها + مقاطع حرفية) — انظر semantic-match.js.
+ * الدرجة النهائية = الأكبر من اللفظية والدلالية، فلا تنقص درجة كانت تُلتقط، ويرافق كل رفع المفاهيم المشتركة التي بُني عليها.
+ * تعود للنتيجة اللفظية وحدها إن تعذّر البناء لأي سبب. محلية بالكامل ولا ترسل شيئًا.
+ */
+const SEMANTIC_INDEX = new WeakMap(); // فهرس لكل مصدر (يُعاد بناؤه تلقائيًا عند تغيّر المصفوفة)
+
+export function compareObservationSemantic(text, corpus, { limit = 5 } = {}) {
+  const lexical = compareObservation(text, corpus, { limit });
+  if (!Array.isArray(corpus) || !corpus.length || !String(text ?? "").trim()) return lexical;
+  try {
+    let index = SEMANTIC_INDEX.get(corpus);
+    if (!index) {
+      index = buildSemanticIndex(corpus);
+      SEMANTIC_INDEX.set(corpus, index);
+    }
+    return blendWithLexical(text, corpus, lexical, { limit, index });
+  } catch {
+    return lexical;
+  }
+}
+
 /* ------------------------------ التصنيف ------------------------------ */
 
 const terms = (s) => s.split("،").map((x) => normalizeArabic(x.trim())).filter(Boolean);
@@ -288,7 +312,7 @@ export function classifyObservation(text, comparison, calibration = loadCalibrat
 
 /** التحليل الكامل في خطوة واحدة (يستعمله الاختبار والواجهة). */
 export function analyzeObservation(text, corpus = loadCorpus(), calibration = loadCalibration()) {
-  const comparison = compareObservation(text, corpus);
+  const comparison = compareObservationSemantic(text, corpus);
   return { comparison, ...classifyObservation(text, comparison, calibration) };
 }
 

@@ -14,7 +14,7 @@ import {
   THRESHOLDS,
   buildObservation,
   classifyObservation,
-  compareObservation,
+  compareObservationSemantic,
   loadCorpus,
   reviewMemo,
 } from "./auditor-draft.js";
@@ -144,7 +144,7 @@ export async function findLegalBasis(query, docs) {
 export async function makeChatDraft(rawText, { force = false, corpus, docs } = {}) {
   const text = extractObservationText(rawText);
   const source = corpus ?? loadCorpus();
-  const comparison = compareObservation(text, source);
+  const comparison = compareObservationSemantic(text, source);
   const analysis = { comparison, ...classifyObservation(text, comparison) };
 
   const prior = comparison.matches.filter((m) => m.reportId !== "current" && m.score >= THRESHOLDS.recurring);

@@ -6,6 +6,7 @@
 import { sodFindings, fraudFindings } from "./advanced";
 import { advancedFindings } from "./advanced-queries";
 import { statisticalFindings } from "./statistical-tests.js";
+import { multivariateFindings } from "./multivariate-anomaly.js";
 import { parseDateMs } from "./dates";
 
 var f = (key, label, type = "text") => ({
@@ -2705,11 +2706,13 @@ function runAudit(store, today = Date.now(), params = {}) {
     }
   }
   const sectorOf = (k) => allDatasets.find((x) => x.key === k)?.sector;
+  const statFindings = statisticalFindings(store, allDatasets, sectorOf, p);
   out.push(
     ...sodFindings(store, sectorOf),
     ...fraudFindings(store, sectorOf),
     ...advancedFindings(store, sectorOf, p, today),
-    ...statisticalFindings(store, allDatasets, sectorOf, p),
+    ...statFindings,
+    ...multivariateFindings(store, allDatasets, sectorOf, p, statFindings),
   );
   return out;
 }
