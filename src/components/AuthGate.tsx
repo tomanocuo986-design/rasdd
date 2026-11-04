@@ -89,7 +89,9 @@ export function AccountBar({ employeeId, onLoggedOut }: { employeeId?: string; o
     <div
       dir="rtl"
       data-testid="account-bar"
-      style={{ position: "fixed", top: 8, left: 8, zIndex: 60, display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}
+      className="rasd-account-bar"
+      // أسفل اليسار: أعلى اليسار تشغله أيقونات الشريط العلوي (الثيم والإعدادات). القائمة تُفتح للأعلى.
+      style={{ position: "fixed", bottom: 12, left: 12, zIndex: 60, display: "flex", flexDirection: "column-reverse", gap: 6, alignItems: "flex-start" }}
     >
       <button type="button" style={barBtn} onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label="الحساب">
         {employeeId ? `الحساب: ${employeeId}` : "الحساب"}

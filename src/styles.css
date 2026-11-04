@@ -161,3 +161,6 @@
 .rasd-ai-approve-actions{display:flex;gap:.5rem}
 .rasd-ai-approve-actions button{border-radius:.5rem;padding:.35rem .8rem;font-size:.8rem;border:1px solid var(--border);background:var(--card);color:var(--foreground)}
 .rasd-ai-approve-actions button[data-primary]{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary)}
+
+/* شريط الحساب: فوق شريط التنقل السفلي في الجوال حتى لا يتداخل معه */
+@media (width<=500px){.rasd-account-bar{bottom:78px!important}}
