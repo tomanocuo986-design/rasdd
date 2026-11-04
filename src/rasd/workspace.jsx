@@ -37,6 +37,7 @@ import { isGarbled, repairArabic } from "./arabic-text.js";
 import BackupPanel from "./BackupPanel";
 import { AdvancedPanel, sodFindings, fraudFindings, complianceOf, valueKeyOf } from "./advanced";
 import { advancedFindings } from "./advanced-queries";
+import { statisticalFindings } from "./statistical-tests.js";
 import { legalFrameworkOf, legalTextOf } from "./legal-framework";
 import { calibrateSeverity, impactAmount, defaultCalibration, loadCalibration, saveCalibration, CALIBRATION_PROFILES, calibrationFields, applyProfile } from "./severity";
 import { buildHistoryIndex, classifyFindings, resolvedFindings, historySummary, findingsFromRows, reportFromJson, extractRecommendations, STATUS_LABEL } from "./history";
@@ -4096,6 +4097,7 @@ function runAudit(store, today = Date.now(), params = {}) {
     ...sodFindings(store, sectorOf),
     ...fraudFindings(store, sectorOf),
     ...advancedFindings(store, sectorOf, p, today),
+    ...statisticalFindings(store, allDatasets, sectorOf, p),
   );
   return out;
 }
