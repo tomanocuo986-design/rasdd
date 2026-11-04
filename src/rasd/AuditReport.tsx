@@ -412,7 +412,7 @@ export function AuditReport({ Button, sevLabel, sevClass, datasetLabel, loadSave
               </article>
             ))}
           </div>
-          <ReportModelPreview observations={exportable} sevLabel={sevLabel} />
+          <ReportModelPreview observations={exportable} sevLabel={sevLabel} onDownloadWord={onExportDocx ? exportDocx : undefined} />
         </div>
       )}
       {msg && <p className="px-6 pb-4 text-xs text-muted-foreground">{msg}</p>}

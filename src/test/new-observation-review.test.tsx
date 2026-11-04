@@ -151,4 +151,36 @@ describe("new observation: drafted, then approved / edited / deleted by the audi
     expect(model.querySelectorAll('[data-testid="model-block"]')).toHaveLength(1);
     for (const t of ["قائمة الملاحظات", "الحالة:", "السند القانوني:", "السبب:", "الأثر:", "التوصيات", "رد إدارة الجهة", "خطة (خطط) العمل", "تعقيب الديوان"]) expect(model.textContent).toContain(t);
   });
+
+  it("report model: the Word download button inside the model sends exactly the approved observations", async () => {
+    const obs = draftObservations([f()]);
+    saveDraft({ date: "2026-11-03", observations: obs });
+    const onDocx = vi.fn(async () => {});
+    const Btn = ({ children, onClick, disabled }: { children?: ReactNode; onClick?: () => void; disabled?: boolean }) => <button onClick={onClick} disabled={disabled}>{children}</button>;
+    const props = { Button: Btn, sevLabel: sev, sevClass: cls, datasetLabel: (k: string) => k, loadSaved: () => [], onExportPdf: async () => {}, onExportDocx: onDocx };
+    const { el } = await mount(<AuditReport {...props} />);
+    // لا ملاحظات معتمدة بعد: لا زر تحميل داخل النموذج
+    expect(el.querySelector('[data-testid="model-download-word"]')).toBeNull();
+    await click(el, "اعتماد الملاحظة");
+    if (el.querySelector('[data-testid="basis-confirm"]')) await click(el, "اعتماد رغم عدم وجود سند من المكتبة");
+    const btn = el.querySelector('[data-testid="model-download-word"]') as HTMLButtonElement;
+    expect(btn).not.toBeNull();
+    expect(btn.textContent).toContain("Word");
+    await act(async () => btn.click());
+    if (el.querySelector('[data-testid="basis-confirm"]')) await click(el, "تصدير Word رغم ذلك");
+    expect(onDocx).toHaveBeenCalledTimes(1);
+    const sent = (onDocx.mock.calls[0] as unknown as [{ observations: { status: string }[] }])[0];
+    expect(sent.observations).toHaveLength(1);
+    expect(sent.observations[0]!.status).toBe("approved");
+  });
+
+  it("report model: no Word button when Word export is not provided", async () => {
+    const obs = draftObservations([f()]);
+    saveDraft({ date: "2026-11-03", observations: obs });
+    saveIds("approved", new Set([obs[0]!.id]));
+    const props = { Button: ({ children }: { children?: ReactNode }) => <button>{children}</button>, sevLabel: sev, sevClass: cls, datasetLabel: (k: string) => k, loadSaved: () => [], onExportPdf: async () => {} };
+    const { el } = await mount(<AuditReport {...props} />);
+    expect(el.querySelector('[data-testid="model-block"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="model-download-word"]')).toBeNull();
+  });
 });
