@@ -18,6 +18,27 @@ with open(os.path.join(HERE, "datasets.json"), encoding="utf-8") as fh:
     SECTORS = json.load(fh)["sectors"]
 
 DATASETS = {d["key"]: {**d, "sector": s["key"], "sector_label": s["label"]} for s in SECTORS for d in s["datasets"]}
+# جداول أول حقل فيها رقم فريد لكل سجل (سند، رخصة، عقد، أمر…). انظر الاختبار رقم 2 في run_audit.
+UNIQUE_ID_DATASETS = frozenset(
+    {
+        "Receipt_Vouchers",
+        "Payment_Vouchers",
+        "Trial_Balance",
+        "Adjustments",
+        "Revenue_Profession_Licenses",
+        "Revenue_Property_Taxes_Regulation",
+        "Revenue_Municipal_Properties_Leases",
+        "HR_Establishment_Table",
+        "HR_Retirees_Settlements",
+        "Fleet_Movement_Orders",
+        "Warehouse_Master_List",
+        "Warehouses_Inbound_Vouchers",
+        "Warehouses_Outbound_Vouchers",
+        "Advances_Temporary",
+        "Direct_Purchases_Orders",
+        "Tenders_Records",
+    }
+)
 SEV_ORDER = {"high": 0, "medium": 1, "low": 2}
 SEV_LABEL = {"high": "مرتفعة", "medium": "متوسطة", "low": "منخفضة"}
 
@@ -130,8 +151,12 @@ def run_audit(store: dict[str, pd.DataFrame], params: dict | None = None, today:
             if miss:
                 add(key, i, "medium", "حقل جوهري ناقص", "لم يُدخل: " + "، ".join(miss))
 
-    # 2) تكرار المعرّفات
+    # 2) تكرار المعرّفات: فقط في الجداول التي أول حقل فيها رقم مستند/سجل فريد لكل صف.
+    #    كان الاختبار يعامل أول حقل في كل جدول معرّفاً، فيُنذر خطأً على رقم الآلية والحساب البنكي ورقم المشروع
+    #    والرقم الوظيفي (تتكرر بطبيعتها). القائمة اجتهاد محافظ؛ أضف جدولاً إليها فقط إن كان رقمه فريداً لكل سجل.
     for key, d in DATASETS.items():
+        if key not in UNIQUE_ID_DATASETS:
+            continue
         idk = d["fields"][0]["key"]
         seen: dict[str, int] = {}
         for i, r in enumerate(_rows(store, key)):

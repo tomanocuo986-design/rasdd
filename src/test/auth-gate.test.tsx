@@ -6,18 +6,20 @@ type Call = { url: string; body?: any };
 let calls: Call[];
 let signedIn: boolean;
 let logoutOk: boolean;
+let registration: string;
 
 beforeEach(() => {
   calls = [];
   signedIn = true;
   logoutOk = true;
+  registration = "open";
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
       const body = init?.body ? JSON.parse(String(init.body)) : undefined;
       calls.push({ url, body });
       const res = (status: number, data: unknown) => ({ ok: status < 400, status, json: async () => data }) as Response;
-      if (!init || init.method !== "POST") return res(200, { user: signedIn ? { employeeId: "U100", role: "auditor" } : null, registration: "open" });
+      if (!init || init.method !== "POST") return res(200, { user: signedIn ? { employeeId: "U100", role: "auditor" } : null, registration });
       if (body.action === "logout" || body.action === "logout-all") {
         if (!logoutOk) return res(500, {});
         signedIn = false;
@@ -74,6 +76,7 @@ describe("AuthGate account bar", () => {
 
   it("is not shown on the login form", async () => {
     signedIn = false;
+    registration = "closed"; // التسجيل المفتوح يبدأ بوضع «إنشاء حساب»؛ المغلق يفتح نموذج الدخول مباشرة
     render(
       <AuthGate>
         <div>محتوى المنصة</div>

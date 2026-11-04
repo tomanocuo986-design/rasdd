@@ -53,6 +53,66 @@ async function api(body: object) {
   return { ok: r.ok, data: await r.json().catch(() => ({})) };
 }
 
+const barBtn: CSSProperties = {
+  font: "inherit",
+  fontSize: 12,
+  padding: "4px 10px",
+  borderRadius: 999,
+  border: "1px solid var(--border, #d4d4d8)",
+  background: "var(--card, #fff)",
+  color: "inherit",
+  cursor: "pointer",
+};
+
+/** شريط الحساب: تسجيل الخروج من هذا الجهاز أو من كل الأجهزة (يُبطل الرمز في الخادم). لا يمسح بيانات مساحة العمل المحلية. */
+export function AccountBar({ employeeId, onLoggedOut }: { employeeId?: string; onLoggedOut: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const leave = async (action: "logout" | "logout-all") => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const { ok } = await api({ action });
+      if (!ok) throw new Error("failed");
+      onLoggedOut();
+    } catch {
+      // لا نُظهر الخروج ناجحاً إن لم يصل الطلب للخادم: الجلسة ما زالت فعّالة
+      setError("تعذّر تسجيل الخروج، تحقق من الاتصال وحاول مرة ثانية");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      dir="rtl"
+      data-testid="account-bar"
+      style={{ position: "fixed", top: 8, left: 8, zIndex: 60, display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}
+    >
+      <button type="button" style={barBtn} onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label="الحساب">
+        {employeeId ? `الحساب: ${employeeId}` : "الحساب"}
+      </button>
+      {open && (
+        <div role="menu" style={{ display: "flex", flexDirection: "column", gap: 6, padding: 8, borderRadius: 12, border: "1px solid var(--border, #d4d4d8)", background: "var(--card, #fff)" }}>
+          <button type="button" role="menuitem" style={barBtn} disabled={busy} onClick={() => leave("logout")}>
+            تسجيل الخروج
+          </button>
+          <button type="button" role="menuitem" style={barBtn} disabled={busy} onClick={() => leave("logout-all")}>
+            الخروج من كل الأجهزة
+          </button>
+          {error && (
+            <div role="alert" style={{ fontSize: 12, color: "var(--danger, #b91c1c)", maxWidth: 220 }}>
+              {error}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AuthGate({ children }: { children: ReactNode }) {
   const [step, setStep] = useState<Step>("checking");
   const [mode, setMode] = useState<Mode>("register");
@@ -65,6 +125,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [shake, setShake] = useState(0);
+  const [me, setMe] = useState("");
 
   useEffect(() => {
     fetch("/api/auth", { credentials: "same-origin" })
@@ -72,6 +133,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       .then((d) => {
         if (d.registration === "invite" || d.registration === "closed") setPolicy(d.registration);
         if (d.registration === "closed") setMode("login");
+        setMe(d.user?.employeeId ?? "");
         setStep(d.user ? "in" : "form");
       })
       .catch(() => setStep("form"));
@@ -95,6 +157,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     );
     setBusy(false);
     if (!ok) return fail(data.error);
+    setMe(data.user?.employeeId ?? "");
     setStep("success");
     setTimeout(() => setStep("in"), 1300);
   };
@@ -105,7 +168,22 @@ export function AuthGate({ children }: { children: ReactNode }) {
     setConfirm("");
   };
 
-  if (step === "in") return <>{children}</>;
+  const loggedOut = () => {
+    setPassword("");
+    setConfirm("");
+    setError("");
+    setMode("login");
+    setMe("");
+    setStep("form");
+  };
+
+  if (step === "in")
+    return (
+      <>
+        <AccountBar employeeId={me} onLoggedOut={loggedOut} />
+        {children}
+      </>
+    );
   if (step === "checking")
     return (
       <div className="auth-screen">

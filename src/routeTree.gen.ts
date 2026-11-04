@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiAgentRouteImport } from './routes/api.agent'
 import { Route as ApiAuthRouteImport } from './routes/api.auth'
 import { Route as ApiChatRouteImport } from './routes/api.chat'
+import { Route as ApiDocReviewRouteImport } from './routes/api.doc-review'
 import { Route as ApiHealthRouteImport } from './routes/api.health'
 import { Route as ApiWorkspacesRouteImport } from './routes/api.workspaces'
 
@@ -36,6 +37,11 @@ const ApiChatRoute = ApiChatRouteImport.update({
   path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDocReviewRoute = ApiDocReviewRouteImport.update({
+  id: '/api/doc-review',
+  path: '/api/doc-review',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/api/agent': typeof ApiAgentRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/doc-review': typeof ApiDocReviewRoute
   '/api/health': typeof ApiHealthRoute
   '/api/workspaces': typeof ApiWorkspacesRoute
 }
@@ -60,6 +67,7 @@ export interface FileRoutesByTo {
   '/api/agent': typeof ApiAgentRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/doc-review': typeof ApiDocReviewRoute
   '/api/health': typeof ApiHealthRoute
   '/api/workspaces': typeof ApiWorkspacesRoute
 }
@@ -69,6 +77,7 @@ export interface FileRoutesById {
   '/api/agent': typeof ApiAgentRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/doc-review': typeof ApiDocReviewRoute
   '/api/health': typeof ApiHealthRoute
   '/api/workspaces': typeof ApiWorkspacesRoute
 }
@@ -79,6 +88,7 @@ export interface FileRouteTypes {
     | '/api/agent'
     | '/api/auth'
     | '/api/chat'
+    | '/api/doc-review'
     | '/api/health'
     | '/api/workspaces'
   fileRoutesByTo: FileRoutesByTo
@@ -87,6 +97,7 @@ export interface FileRouteTypes {
     | '/api/agent'
     | '/api/auth'
     | '/api/chat'
+    | '/api/doc-review'
     | '/api/health'
     | '/api/workspaces'
   id:
@@ -95,6 +106,7 @@ export interface FileRouteTypes {
     | '/api/agent'
     | '/api/auth'
     | '/api/chat'
+    | '/api/doc-review'
     | '/api/health'
     | '/api/workspaces'
   fileRoutesById: FileRoutesById
@@ -104,6 +116,7 @@ export interface RootRouteChildren {
   ApiAgentRoute: typeof ApiAgentRoute
   ApiAuthRoute: typeof ApiAuthRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiDocReviewRoute: typeof ApiDocReviewRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiWorkspacesRoute: typeof ApiWorkspacesRoute
 }
@@ -138,6 +151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/doc-review': {
+      id: '/api/doc-review'
+      path: '/api/doc-review'
+      fullPath: '/api/doc-review'
+      preLoaderRoute: typeof ApiDocReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/health': {
       id: '/api/health'
       path: '/api/health'
@@ -160,6 +180,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAgentRoute: ApiAgentRoute,
   ApiAuthRoute: ApiAuthRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiDocReviewRoute: ApiDocReviewRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiWorkspacesRoute: ApiWorkspacesRoute,
 }

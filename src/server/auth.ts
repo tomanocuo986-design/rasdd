@@ -1,9 +1,13 @@
 // Employee-ID + password sign-in (no email, no OTP).
 //   POST /api/auth {action:"register", employeeId, password, confirm} -> creates the account, sets a 30-day signed session cookie
 //   POST /api/auth {action:"login", employeeId, password}              -> sets the session cookie
-//   POST /api/auth {action:"logout"}                                   -> clears the cookie
+//   POST /api/auth {action:"logout"}                                   -> revokes this session on the server and clears the cookie
+//   POST /api/auth {action:"logout-all"}                               -> revokes every session of the current user (all devices)
+//   POST /api/auth {action:"revoke-sessions", employeeId}              -> admin only: revokes every session of that user
 //   GET  /api/auth                                                     -> {user:{employeeId}|null}
-// Users: PostgreSQL if DATABASE_URL is set (persistent), otherwise a JSON file in AUTH_DATA_DIR (default ./data).
+// Users and sessions: PostgreSQL if DATABASE_URL is set (persistent), otherwise JSON files in AUTH_DATA_DIR (default ./data).
+// The cookie is signed and carries only a random session id (sid); it is honoured only while the sid is live in the session
+// store, so logout, an admin revocation or a deleted account ends a session immediately instead of at the 30-day expiry.
 import { createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -108,22 +112,32 @@ function fileStore(): Store {
     list: async () => Object.values(await read()),
   };
 }
+// مجمّع اتصالات واحد لمخزني المستخدمين والجلسات (كان يُنشأ مجمّع جديد مع كل طلب).
+let sharedPool: Promise<any> | undefined;
+const pgPool = () =>
+  (sharedPool ??= (async () => {
+    // @ts-ignore
+    const { default: pg } = await import("pg");
+    return new pg.Pool({
+      connectionString: env("DATABASE_URL"),
+      ssl: env("DATABASE_SSL") === "require" ? { rejectUnauthorized: false } : undefined,
+    });
+  })());
+
 function pgStore(): Store {
-  let pool: Promise<any> | undefined;
+  let ready: Promise<any> | undefined;
   const getPool = () =>
-    (pool ??= (async () => {
-      // @ts-ignore
-      const { default: pg } = await import("pg");
-      const p = new pg.Pool({
-        connectionString: env("DATABASE_URL"),
-        ssl: env("DATABASE_SSL") === "require" ? { rejectUnauthorized: false } : undefined,
-      });
+    (ready ??= (async () => {
+      const p = await pgPool();
       await p.query(
         `create table if not exists rasd_users_emp (employee_id text primary key, password_hash text not null, created_at timestamptz not null default now())`,
       );
       await p.query(`alter table rasd_users_emp add column if not exists role text not null default 'auditor'`);
       return p;
-    })());
+    })().catch((e) => {
+      ready = undefined; // لا نحتفظ بفشل عابر (قاعدة البيانات غير جاهزة بعد) فتُعاد المحاولة في الطلب التالي
+      throw e;
+    }));
   const toUser = (r: any): User => ({
     employeeId: r.employee_id,
     passwordHash: r.password_hash,
@@ -149,7 +163,131 @@ function pgStore(): Store {
     },
   };
 }
-const store = () => (env("DATABASE_URL") ? pgStore() : fileStore());
+
+// ---------- sessions ----------
+// الجلسة سجل في الخادم (لا رمز مستقل بذاته): تُلغى بتسجيل الخروج أو بقرار المدير، ويسقطها حذف الحساب.
+type Session = { sid: string; employeeId: string; createdAt: string; expiresAt: number; revokedAt?: string };
+interface SessionStore {
+  create(s: Session): Promise<void>;
+  get(sid: string): Promise<Session | null>;
+  revoke(sid: string): Promise<boolean>; // false إن لم توجد جلسة فعّالة بهذا المعرّف
+  revokeAllFor(employeeId: string): Promise<number>; // عدد الجلسات الفعّالة التي أُلغيت
+}
+const newSid = () => randomBytes(24).toString("base64url");
+const live = (s: Session | null | undefined, now = Date.now()): s is Session => !!s && !s.revokedAt && s.expiresAt > now;
+
+function fileSessionStore(): SessionStore {
+  const f = path.join(dataDir(), "sessions.json");
+  const read = async (): Promise<Record<string, Session>> => {
+    try {
+      return JSON.parse(await fs.readFile(f, "utf8"));
+    } catch {
+      return {};
+    }
+  };
+  const write = async (all: Record<string, Session>) => {
+    await fs.mkdir(dataDir(), { recursive: true });
+    await fs.writeFile(f, JSON.stringify(all), { mode: 0o600 });
+  };
+  // قراءة ثم كتابة تُنفَّذان على التوالي كي لا يضيع إلغاء بسبب طلبين متزامنين
+  let chain: Promise<unknown> = Promise.resolve();
+  const exclusive = <T,>(fn: () => Promise<T>): Promise<T> => {
+    const run = chain.then(fn, fn);
+    chain = run.catch(() => undefined);
+    return run;
+  };
+  return {
+    create: (s) =>
+      exclusive(async () => {
+        const now = Date.now();
+        const all = await read();
+        for (const [k, v] of Object.entries(all)) if (v.expiresAt <= now) delete all[k]; // تنظيف المنتهية
+        all[s.sid] = s;
+        await write(all);
+      }),
+    get: async (sid) => (await read())[sid] ?? null,
+    revoke: (sid) =>
+      exclusive(async () => {
+        const all = await read();
+        if (!live(all[sid])) return false;
+        all[sid] = { ...all[sid], revokedAt: new Date().toISOString() };
+        await write(all);
+        return true;
+      }),
+    revokeAllFor: (employeeId) =>
+      exclusive(async () => {
+        const all = await read();
+        let n = 0;
+        for (const [k, v] of Object.entries(all)) {
+          if (v.employeeId === employeeId && live(v)) {
+            all[k] = { ...v, revokedAt: new Date().toISOString() };
+            n++;
+          }
+        }
+        if (n) await write(all);
+        return n;
+      }),
+  };
+}
+
+function pgSessionStore(): SessionStore {
+  let ready: Promise<any> | undefined;
+  const getPool = () =>
+    (ready ??= (async () => {
+      const p = await pgPool();
+      await p.query(
+        `create table if not exists rasd_sessions (sid text primary key, employee_id text not null, created_at timestamptz not null default now(), expires_at timestamptz not null, revoked_at timestamptz)`,
+      );
+      await p.query(`create index if not exists rasd_sessions_employee on rasd_sessions (employee_id)`);
+      return p;
+    })().catch((e) => {
+      ready = undefined;
+      throw e;
+    }));
+  return {
+    create: async (s) => {
+      const p = await getPool();
+      await p.query("delete from rasd_sessions where expires_at < now()"); // تنظيف المنتهية
+      await p.query("insert into rasd_sessions(sid,employee_id,created_at,expires_at) values($1,$2,$3,$4)", [
+        s.sid,
+        s.employeeId,
+        s.createdAt,
+        new Date(s.expiresAt).toISOString(),
+      ]);
+    },
+    get: async (sid) => {
+      const r = await (await getPool()).query("select * from rasd_sessions where sid=$1", [sid]);
+      const x = r.rows[0];
+      return x
+        ? {
+            sid: x.sid,
+            employeeId: x.employee_id,
+            createdAt: new Date(x.created_at).toISOString(),
+            expiresAt: new Date(x.expires_at).getTime(),
+            revokedAt: x.revoked_at ? new Date(x.revoked_at).toISOString() : undefined,
+          }
+        : null;
+    },
+    revoke: async (sid) =>
+      (await (await getPool()).query("update rasd_sessions set revoked_at=now() where sid=$1 and revoked_at is null and expires_at > now()", [sid]))
+        .rowCount === 1,
+    revokeAllFor: async (employeeId) =>
+      (await (await getPool()).query("update rasd_sessions set revoked_at=now() where employee_id=$1 and revoked_at is null and expires_at > now()", [employeeId]))
+        .rowCount ?? 0,
+  };
+}
+
+let storeCache: { key: string; users: Store; sessions: SessionStore } | undefined;
+const stores = () => {
+  const key = `${env("DATABASE_URL") ?? ""}|${dataDir()}`;
+  if (storeCache?.key !== key) {
+    const pg = !!env("DATABASE_URL");
+    storeCache = { key, users: pg ? pgStore() : fileStore(), sessions: pg ? pgSessionStore() : fileSessionStore() };
+  }
+  return storeCache;
+};
+const store = () => stores().users;
+const sessions = () => stores().sessions;
 
 // ---------- rate limiting (in memory) ----------
 const fails = new Map<string, { n: number; until: number }>();
@@ -184,11 +322,19 @@ const readCookie = (req: Request) =>
 
 export type SessionUser = { employeeId: string; role: Role };
 
+/** الجلسة الفعّالة من ملف تعريف الارتباط: التوقيع صحيح والمعرّف حيّ في الخادم (غير ملغى ولا منتهٍ). رمز بلا معرّف (قبل هذا التعديل) يُرفض فيُعاد الدخول مرة واحدة. */
+async function liveSession(req: Request): Promise<Session | null> {
+  const s = await unsign<{ e: string; sid?: string; exp: number }>(readCookie(req));
+  if (!s || typeof s.sid !== "string" || !s.sid) return null;
+  const rec = await sessions().get(s.sid);
+  return live(rec) && rec.employeeId === s.e ? rec : null;
+}
+
 /** المستخدم الحالي من ملف تعريف الارتباط الموقَّع، والدور يُقرأ من الخادم (يسري تغييره فورًا ويسقط حذف الحساب الجلسة). */
 export async function currentUser(req: Request): Promise<SessionUser | null> {
-  const s = await unsign<{ e: string; exp: number }>(readCookie(req));
-  if (!s) return null;
-  const user = await store().get(s.e);
+  const sess = await liveSession(req);
+  if (!sess) return null;
+  const user = await store().get(sess.employeeId);
   return user ? { employeeId: user.employeeId, role: effectiveRole(user) } : null;
 }
 
@@ -231,9 +377,36 @@ export async function handlePost(req: Request) {
   }
 
   if (body.action === "logout") {
-    const u = await currentUser(req);
-    if (u) await logEvent({ actor: u.employeeId, role: u.role, action: "auth.logout" });
+    const sess = await liveSession(req);
+    if (sess) {
+      const user = await store().get(sess.employeeId);
+      await sessions().revoke(sess.sid);
+      await logEvent({ actor: sess.employeeId, role: user ? effectiveRole(user) : undefined, action: "auth.logout" });
+    }
     return json(200, { ok: true }, { "set-cookie": cookieHeader("", 0, req) });
+  }
+
+  // إنهاء كل جلسات المستخدم الحالي (كل الأجهزة): عند الشك بسرقة الرمز أو فقدان جهاز
+  if (body.action === "logout-all") {
+    const u = await currentUser(req);
+    if (!u) return json(401, { error: "unauthenticated" });
+    const n = await sessions().revokeAllFor(u.employeeId);
+    await logEvent({ actor: u.employeeId, role: u.role, action: "auth.logout_all", detail: `revoked=${n}` });
+    return json(200, { ok: true, revoked: n }, { "set-cookie": cookieHeader("", 0, req) });
+  }
+
+  // إنهاء كل جلسات مستخدم آخر: للمدير فقط، ويُسجَّل (فصل موظف، حساب مشتبه به)
+  if (body.action === "revoke-sessions") {
+    const u = await currentUser(req);
+    if (!u) return json(401, { error: "unauthenticated" });
+    if (!can(u.role, "users.manage")) return json(403, { error: "forbidden" });
+    const target = normId(body.employeeId);
+    if (!ID_RE.test(target)) return json(400, { error: "bad_request" });
+    if (!(await store().get(target))) return json(404, { error: "not_found" });
+    const n = await sessions().revokeAllFor(target);
+    await logEvent({ actor: u.employeeId, role: u.role, action: "users.revoke_sessions", target, detail: `revoked=${n}` });
+    // إن أنهى المدير جلساته هو يُمسح الكوكي أيضاً
+    return json(200, { ok: true, revoked: n }, target === u.employeeId ? { "set-cookie": cookieHeader("", 0, req) } : {});
   }
 
   // حدث من الواجهة (قرار مدقق ذو أثر): يُختم باسم الجلسة ودورها، لا باسم يرسله المتصفح
@@ -306,7 +479,10 @@ export async function handlePost(req: Request) {
       await logEvent({ actor: employeeId, role: effectiveRole(user), action: "auth.login", detail: `ip=${ip}` });
     }
     keys.forEach((k) => fails.delete(k));
-    const session = await sign({ e: employeeId, exp: Date.now() + SESSION_MS });
+    const sid = newSid();
+    const expiresAt = Date.now() + SESSION_MS;
+    await sessions().create({ sid, employeeId, createdAt: new Date().toISOString(), expiresAt });
+    const session = await sign({ e: employeeId, sid, exp: expiresAt });
     return json(
       200,
       { user: { employeeId, role: effectiveRole(created) }, mode: body.action },

@@ -1,4 +1,5 @@
-import { mkdtempSync } from "node:fs";
+import { createHmac } from "node:crypto";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -82,5 +83,93 @@ describe("auth with roles, invite code and audit log", () => {
     expect(demote.status).toBe(400);
     const events = (await (await auth.handleGet(get("?audit=1&limit=500", adm))).json()).events;
     expect(events.some((e: any) => e.action === "auth.login_failed" && e.actor === "U100")).toBe(true);
+  });
+});
+
+describe("server-side sessions: revocation", () => {
+  const cookieValue = (c: string) => c.split("=")[1];
+  // كوكي موقَّع بسر الخادم نفسه (الملف الذي يولّده auth.ts في AUTH_DATA_DIR) لنختبر الصيغ التي يرفضها الخادم رغم صحة التوقيع
+  const signedCookie = (payload: object) => {
+    const key = readFileSync(path.join(process.env["AUTH_DATA_DIR"]!, "auth-secret"), "utf8").trim();
+    const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+    return `rasd_session=${body}.${createHmac("sha256", key).update(body).digest("base64url")}`;
+  };
+  const tamper = (c: string, patch: object) => {
+    const [body, mac] = cookieValue(c).split(".");
+    const payload = { ...JSON.parse(Buffer.from(body, "base64url").toString()), ...patch };
+    return `rasd_session=${Buffer.from(JSON.stringify(payload)).toString("base64url")}.${mac}`;
+  };
+  const me = async (c: string) => (await (await auth.handleGet(get("", c))).json()).user;
+
+  it("logout revokes the token on the server: replaying the old cookie no longer works", async () => {
+    const c = cookieOf(await register("S-OUT1"));
+    expect((await me(c))?.employeeId).toBe("S-OUT1");
+    const out = await auth.handlePost(post({ action: "logout" }, c));
+    expect(out.status).toBe(200);
+    expect(out.headers.get("set-cookie")).toContain("Max-Age=0");
+    expect(await me(c)).toBeNull(); // الكوكي المنسوخ قبل الخروج لم يعد صالحاً
+    expect((await auth.handlePost(post({ action: "event", event: "ui.report.export" }, c))).status).toBe(401);
+  });
+
+  it("logout only ends that session; other devices stay signed in", async () => {
+    const a = cookieOf(await register("S-TWO"));
+    const b = cookieOf(await auth.handlePost(post({ action: "login", employeeId: "S-TWO", password: PW })));
+    expect(a).not.toBe(b);
+    await auth.handlePost(post({ action: "logout" }, a));
+    expect(await me(a)).toBeNull();
+    expect((await me(b))?.employeeId).toBe("S-TWO");
+  });
+
+  it("logout-all ends every session of the user, and requires a session", async () => {
+    expect((await auth.handlePost(post({ action: "logout-all" }))).status).toBe(401);
+    const a = cookieOf(await register("S-ALL"));
+    const b = cookieOf(await auth.handlePost(post({ action: "login", employeeId: "S-ALL", password: PW })));
+    const r = await auth.handlePost(post({ action: "logout-all" }, a));
+    expect(r.status).toBe(200);
+    expect((await r.json()).revoked).toBe(2);
+    expect(await me(a)).toBeNull();
+    expect(await me(b)).toBeNull();
+  });
+
+  it("an admin can revoke another user's sessions; others cannot; it is logged", async () => {
+    const victim = cookieOf(await register("S-VICTIM"));
+    const aud = cookieOf(await register("S-AUD"));
+    expect((await auth.handlePost(post({ action: "revoke-sessions", employeeId: "S-VICTIM" }, aud))).status).toBe(403);
+    expect((await auth.handlePost(post({ action: "revoke-sessions", employeeId: "S-VICTIM" }))).status).toBe(401);
+    expect((await me(victim))?.employeeId).toBe("S-VICTIM");
+
+    const adm = cookieOf(await auth.handlePost(post({ action: "login", employeeId: "ADMIN1", password: PW })));
+    expect((await auth.handlePost(post({ action: "revoke-sessions", employeeId: "NOBODY-X" }, adm))).status).toBe(404);
+    const r = await auth.handlePost(post({ action: "revoke-sessions", employeeId: "S-VICTIM" }, adm));
+    expect(r.status).toBe(200);
+    expect((await r.json()).revoked).toBe(1);
+    expect(await me(victim)).toBeNull();
+    expect((await me(adm))?.employeeId).toBe("ADMIN1"); // جلسة المدير لم تتأثر
+
+    const events = (await (await auth.handleGet(get("?audit=1&limit=500", adm))).json()).events;
+    const ev = events.find((e: any) => e.action === "users.revoke_sessions" && e.target === "S-VICTIM");
+    expect(ev?.actor).toBe("ADMIN1");
+    expect(events.some((e: any) => e.action === "auth.logout" && e.actor === "S-OUT1")).toBe(true);
+  });
+
+  it("rejects a validly signed cookie with no session id (old format) or an unknown one, and tampering", async () => {
+    const c = cookieOf(await register("S-FORGE"));
+    const exp = Date.now() + 3600_000;
+    expect(await me(signedCookie({ e: "S-FORGE", exp }))).toBeNull(); // الصيغة القديمة بلا معرّف
+    expect(await me(signedCookie({ e: "S-FORGE", sid: "does-not-exist", exp }))).toBeNull();
+    expect(await me(tamper(c, { e: "ADMIN1" }))).toBeNull(); // تعديل الحمولة يُسقط التوقيع
+    // معرّف جلسة حيّة لمستخدم آخر لا يصلح لانتحال غيره
+    const real = JSON.parse(Buffer.from(cookieValue(c).split(".")[0], "base64url").toString());
+    expect(await me(signedCookie({ e: "ADMIN1", sid: real.sid, exp }))).toBeNull();
+    expect((await me(c))?.employeeId).toBe("S-FORGE");
+  });
+
+  it("concurrent logins all get distinct live sessions (no lost writes in the file store)", async () => {
+    await register("S-CONC");
+    const cookies = (
+      await Promise.all(Array.from({ length: 6 }, () => auth.handlePost(post({ action: "login", employeeId: "S-CONC", password: PW }))))
+    ).map(cookieOf);
+    expect(new Set(cookies).size).toBe(6);
+    for (const c of cookies) expect((await me(c))?.employeeId).toBe("S-CONC");
   });
 });

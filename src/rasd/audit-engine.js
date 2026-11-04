@@ -5,6 +5,7 @@
 // workspace.jsx ما زال يُصدّر هذه الأسماء نفسها فلا تتغير أي استيرادات قائمة. يقابله محرك Python في python/audit_engine.py (انظر docs/ENGINE.ar.md).
 import { sodFindings, fraudFindings } from "./advanced";
 import { advancedFindings } from "./advanced-queries";
+import { statisticalFindings } from "./statistical-tests.js";
 import { parseDateMs } from "./dates";
 
 var f = (key, label, type = "text") => ({
@@ -2708,6 +2709,7 @@ function runAudit(store, today = Date.now(), params = {}) {
     ...sodFindings(store, sectorOf),
     ...fraudFindings(store, sectorOf),
     ...advancedFindings(store, sectorOf, p, today),
+    ...statisticalFindings(store, allDatasets, sectorOf, p),
   );
   return out;
 }

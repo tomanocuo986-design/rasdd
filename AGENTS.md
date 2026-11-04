@@ -9,5 +9,5 @@
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
 
-- The Rasd app lives in src/rasd/workspace.jsx (recovered from a compiled build, plain JS with jsx() calls); activities are defined in its auditSectors array and checks in runAudit.
+- The Rasd UI lives in src/rasd/workspace.jsx (recovered from a compiled build, plain JS with jsx() calls). The audit engine was extracted verbatim to src/rasd/audit-engine.js: activities are defined in its auditSectors array, parameters in defaultParams, and checks in runAudit. workspace.jsx re-exports them, so existing imports keep working; edit engine logic in audit-engine.js.
 - src/styles.css is the precompiled stylesheet from the original build; reuse existing classes, since new Tailwind classes are not generated.
