@@ -24,5 +24,9 @@ services:
         value: invite
       - key: AUTH_INVITE_CODE
         sync: false # رمز دعوة تعطيه للمدققين عند إنشاء حساباتهم
+      - key: DATABASE_SSL
+        value: require # يتحقق من الشهادة. إن فشل الاتصال بعنوان خارجي: استخدم عنوان Render الداخلي، أو no-verify مؤقتاً
+      - key: TRUST_PROXY_HOPS
+        value: "1"
       - key: RASD_ADMINS
         sync: false # الأرقام الوظيفية للمديرين، مفصولة بفواصل

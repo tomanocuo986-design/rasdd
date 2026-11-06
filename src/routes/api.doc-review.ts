@@ -6,12 +6,13 @@ import { can } from "../server/roles.ts";
 import { providerFromEnv } from "../server/llm.ts";
 import { MAX_CHUNK_CHARS, completionBody, completionText, externalAllowed, isExternalProvider } from "../server/doc-review.ts";
 import { CHECKLIST_IDS, MAX_CHUNKS, REVIEW_SYSTEM, buildUserPrompt } from "../rasd/doc-review.js";
+import { createLimiter } from "../server/rate-limit.ts";
 
 // مراجعة مقطع واحد من مستند عطاء مقابل بنود قائمة التحقق. المتصفح يقطّع المستند ويستدعي هذا المسار لكل مقطع،
 // ثم يتحقق من الاقتباسات ويدمج النتائج محلياً. الخادم لا يخزّن النص ولا يسجّله (يسجّل رقم المقطع وعدد البنود فقط).
 
-const RATE_LIMIT = 30; // مقطع لكل دقيقة لكل عنوان
-const buckets = new Map<string, number[]>();
+// حدّ لكل مستخدم مسجَّل (الرقم الوظيفي)، لا لكل عنوان: العنوان يزوّره العميل، والمستخدم لا يستطيع تغيير هويته
+const limited = createLimiter({ max: 30, windowMs: 60_000 }); // مقطع لكل دقيقة لكل مستخدم
 
 const bodySchema = z.object({
   text: z.string().min(20).max(MAX_CHUNK_CHARS),
@@ -19,21 +20,6 @@ const bodySchema = z.object({
   index: z.number().int().min(1).max(MAX_CHUNKS),
   total: z.number().int().min(1).max(MAX_CHUNKS),
 });
-
-const clientKey = (r: Request) =>
-  r.headers.get("cf-connecting-ip") ||
-  r.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-  r.headers.get("x-real-ip") ||
-  "anon";
-
-function limited(key: string) {
-  const now = Date.now();
-  const hits = (buckets.get(key) ?? []).filter((t) => now - t < 60_000);
-  hits.push(now);
-  buckets.set(key, hits);
-  if (buckets.size > 5000) buckets.clear();
-  return hits.length > RATE_LIMIT;
-}
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -53,7 +39,7 @@ export const Route = createFileRoute("/api/doc-review")({
         if (!provider) return fail(503, "الذكاء الاصطناعي غير مفعّل: اضبط LLM_BASE_URL أو GEMINI_API_KEY على الخادم.");
         if (isExternalProvider(provider) && !externalAllowed())
           return fail(403, "مراجعة المستندات تتطلب نموذجاً محلياً داخل شبكة الجهة (LLM_BASE_URL). لاستخدام مزود خارجي يضبط المسؤول DOC_REVIEW_ALLOW_EXTERNAL=1 بعد تقدير المخاطر.");
-        if (limited(clientKey(request))) return fail(429, "طلبات كثيرة، حاول بعد دقيقة.");
+        if (limited(user.employeeId)) return fail(429, "طلبات كثيرة، حاول بعد دقيقة.");
 
         let parsed;
         try {

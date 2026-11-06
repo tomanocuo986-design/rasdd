@@ -4,6 +4,7 @@ import { currentUser } from "../server/auth.ts";
 import { logEvent } from "../server/audit-log.ts";
 import { can } from "../server/roles.ts";
 import { aiLogDetail, gateProvider, sanitizeForAI } from "../server/ai-policy.ts";
+import { createLimiter } from "../server/rate-limit.ts";
 
 import {
   geminiBody,
@@ -15,8 +16,8 @@ import {
 } from "../server/llm.ts";
 
 const MAX_TURNS = 20;
-const RATE_LIMIT = 20; // طلبات لكل دقيقة لكل عنوان
-const buckets = new Map<string, number[]>();
+// حدّ لكل مستخدم مسجَّل (الرقم الوظيفي)، لا لكل عنوان: العنوان يزوّره العميل، والمستخدم لا يستطيع تغيير هويته
+const limited = createLimiter({ max: 20, windowMs: 60_000 }); // طلبات لكل دقيقة لكل مستخدم
 
 const bodySchema = z.object({
   messages: z
@@ -36,25 +37,6 @@ const bodySchema = z.object({
     .optional(),
   mode: z.enum(["chat", "analyze", "report"]).optional(),
 });
-
-function clientKey(request: Request) {
-  const h = request.headers;
-  return (
-    h.get("cf-connecting-ip") ||
-    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    h.get("x-real-ip") ||
-    "anon"
-  );
-}
-
-function limited(key: string) {
-  const now = Date.now();
-  const hits = (buckets.get(key) ?? []).filter((t) => now - t < 60_000);
-  hits.push(now);
-  buckets.set(key, hits);
-  if (buckets.size > 5000) buckets.clear();
-  return hits.length > RATE_LIMIT;
-}
 
 function json(status: number, error: string) {
   return new Response(JSON.stringify({ error }), {
@@ -80,7 +62,7 @@ export const Route = createFileRoute("/api/chat")({
           void logEvent({ actor: user.employeeId, role: user.role, action: "ai.blocked", detail: "route=chat provider=external" });
           return json(gate.status, gate.message);
         }
-        if (limited(clientKey(request))) return json(429, "طلبات كثيرة، حاول بعد دقيقة.");
+        if (limited(user.employeeId)) return json(429, "طلبات كثيرة، حاول بعد دقيقة.");
 
         let parsed;
         try {

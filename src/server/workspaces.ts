@@ -8,7 +8,9 @@
 // Auth: Authorization: Bearer <token>, tokens configured as RASD_API_TOKENS="auditor1:tokenA,auditor2:tokenB".
 // Each token's name is the owner: auditors only ever see their own workspaces.
 import { createHash, timingSafeEqual } from "node:crypto";
+import { clientIp } from "./client-ip.ts";
 import { decryptField, encryptField, type KeyRing } from "./field-crypto.ts";
+import { failStore } from "./rate-limit.ts";
 
 export type Row = { id: string; nameEnc: string; payloadEnc: string; version: number; updatedAt: string };
 export type PutResult = { ok: true; version: number } | { ok: false; current: number };
@@ -30,6 +32,8 @@ export type Deps = {
 };
 
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const WS_MAX_FAILS = 20;
+const WS_LOCK_MS = 10 * 60 * 1000;
 const sha = (s: string) => createHash("sha256").update(s).digest();
 
 export function parseTokens(raw: string | undefined): Map<string, string> {
@@ -61,8 +65,15 @@ const json = (status: number, body: unknown) =>
 const err = (status: number, error: string, extra: object = {}) => json(status, { error, ...extra });
 
 export async function handleWorkspaces(request: Request, deps: Deps): Promise<Response> {
+  // تخمين الرموز: بعد WS_MAX_FAILS رمز خاطئ من عنوان واحد يُقفل العنوان WS_LOCK_MS (الحدّ كان غائباً عن هذا المسار)
+  const ip = clientIp(request);
+  const failKey = `ws:${ip}`;
+  if (await failStore().isLocked(failKey, WS_MAX_FAILS)) return err(429, "محاولات كثيرة، حاول لاحقاً.");
   const owner = authOwner(request, deps.tokens);
-  if (!owner) return err(401, "غير مصرّح: رمز الدخول غير صحيح.");
+  if (!owner) {
+    await failStore().note(failKey, WS_LOCK_MS);
+    return err(401, "غير مصرّح: رمز الدخول غير صحيح.");
+  }
   const url = new URL(request.url);
   const id = url.searchParams.get("id");
   const aad = (wid: string) => `${owner}:${wid}`;

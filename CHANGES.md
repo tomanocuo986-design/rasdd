@@ -217,3 +217,11 @@
 - **ذكاء اصطناعي**: `LLM_BASE_URL` لنموذج محلي (Ollama/vLLM) بجانب Gemini، ووضع «مسودة تقرير التدقيق» (السند القانوني من `legal-articles.json` فقط).
 - **النشر**: `Dockerfile` و`docker-compose.yml` و`docs/DEPLOYMENT.ar.md`. أضيفت `pg` إلى `package.json` — شغّل `npm install` لتحديث ملفات القفل.
 - اختبارات: `src/test/hybrid.test.ts`.
+
+## إصلاحات أمنية
+- التسجيل الافتراضي صار `closed`؛ و`open` يُمنع فيه تسجيل أرقام RASD_ADMINS/RASD_REVIEWERS، وهذه الأرقام لا تُسجَّل إلا برمز الدعوة.
+- عنوان العميل يُقرأ من آخر عنصر في x-forwarded-for (TRUST_PROXY_HOPS)؛ حدود المحاولات: زوج (حساب+عنوان) 8، عنوان 30، حساب 60، وتُحفظ في PostgreSQL عند وجوده.
+- حدّ طلبات المساعد/الوكيل/مراجعة المستندات صار لكل مستخدم مسجَّل، وحدّ تخمين رموز /api/workspaces.
+- التحقق من شهادة PostgreSQL افتراضياً (DATABASE_SSL=require)، و`no-verify` خيار صريح.
+- تساوي زمن الدخول لحساب غير موجود، وإصلاح أخطاء الأنواع في auth.ts وAuthGate.tsx.
+- اختبار بنفورد: تصحيح بونفروني على عدد مجموعات البيانات المختبَرة.

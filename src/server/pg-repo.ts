@@ -1,5 +1,6 @@
 // PostgreSQL implementation of the workspace repo (DATABASE_URL). Values arrive already encrypted (field-crypto.ts),
 // so the database, its backups and its admins only ever see ciphertext for names and payloads.
+import { pgPool } from "./pg-pool.ts";
 import type { PutResult, Repo, Row } from "./workspaces.ts";
 
 type Pool = { query: (sql: string, params?: unknown[]) => Promise<{ rows: any[] }> };
@@ -8,14 +9,7 @@ let poolPromise: Promise<Pool> | undefined;
 
 async function getPool(): Promise<Pool> {
   poolPromise ??= (async () => {
-    // @ts-ignore - `pg` is a runtime dependency (listed in package.json)
-    const { default: pg } = await import("pg");
-    const ssl = process.env["DATABASE_SSL"] === "require" ? { rejectUnauthorized: false } : undefined;
-    const pool: Pool = new pg.Pool({
-      connectionString: process.env["DATABASE_URL"],
-      max: Number(process.env["DATABASE_POOL_MAX"] ?? 10),
-      ssl,
-    });
+    const pool: Pool = await pgPool();
     await pool.query(`
       create table if not exists rasd_workspaces (
         owner       text        not null,
