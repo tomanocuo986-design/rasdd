@@ -21,7 +21,8 @@ describe("roles", () => {
   });
 
   it("registration policy", () => {
-    expect(registrationPolicy({})).toBe("open");
+    expect(registrationPolicy({})).toBe("closed"); // النسيان لا يفتح التسجيل
+    expect(registrationPolicy({ AUTH_REGISTRATION: "open" })).toBe("open");
     expect(registrationPolicy({ AUTH_INVITE_CODE: "abc" })).toBe("invite");
     expect(registrationPolicy({ AUTH_REGISTRATION: "closed", AUTH_INVITE_CODE: "abc" })).toBe("closed");
   });

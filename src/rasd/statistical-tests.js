@@ -39,8 +39,6 @@ export const valueKey = (ds) =>
 /* ------------------------------ 1) قانون بنفورد ------------------------------ */
 
 export const BENFORD = Array.from({ length: 9 }, (_, i) => Math.log10(1 + 1 / (i + 1)));
-const CHI_05 = 15.507; // df = 8, p = 0.05
-const CHI_01 = 20.09; // df = 8, p = 0.01
 
 export function firstDigit(v) {
   const x = Math.abs(v);
@@ -69,25 +67,49 @@ export function benfordTest(values, minN = 100) {
   return { n, counts, chi2, mad, worst };
 }
 
+/** احتمال أن تبلغ χ² قيمة x أو أكثر عند درجات حرية = 8 (اتساق تام مع بنفورد). للدرجات الزوجية: e^(-x/2) · Σ (x/2)^i / i! حتى i = 3. */
+export function chi2Sf8(x) {
+  if (!(x > 0)) return 1;
+  const h = x / 2;
+  let term = 1;
+  let sum = 1;
+  for (let i = 1; i < 4; i++) {
+    term *= h / i;
+    sum += term;
+  }
+  return Math.exp(-h) * sum;
+}
+
+/**
+ * يختبر عموداً واحداً لكل مجموعة بيانات. كل مجموعة اختبار مستقل، ومع كثرتها تتراكم الإنذارات الكاذبة؛
+ * فنطبّق تصحيح بونفروني: عتبة الدلالة تُقسم على عدد الاختبارات التي أُجريت فعلاً (m).
+ * مع m = 1 تبقى العتبات كما كانت (p < 0.01 للعالية، p < 0.05 للمتوسطة) إضافة إلى شرط متوسط الانحراف المطلق.
+ */
 export function benfordFindings(store, datasets, sectorOf, { minN = 100 } = {}) {
-  const out = [];
+  const tested = [];
   for (const ds of datasets) {
     const key = valueKey(ds);
     if (!key) continue;
     const t = benfordTest((store[ds.key] ?? []).map((r) => num(r[key])).filter((x) => x !== undefined), minN);
-    if (!t) continue;
+    if (t) tested.push({ ds, key, t });
+  }
+  const m = Math.max(tested.length, 1);
+  const out = [];
+  for (const { ds, key, t } of tested) {
+    const p = chi2Sf8(t.chi2);
     let severity;
-    if (t.chi2 > CHI_01 && t.mad > 0.015) severity = "high";
-    else if (t.chi2 > CHI_05 && t.mad > 0.012) severity = "medium";
+    if (p < 0.01 / m && t.mad > 0.015) severity = "high";
+    else if (p < 0.05 / m && t.mad > 0.012) severity = "medium";
     if (!severity) continue;
     const label = ds.fields.find((f) => f.key === key)?.label ?? key;
+    const multi = m > 1 ? ` (بعد تصحيح تعدد الاختبارات على ${m} مجموعات بيانات)` : "";
     out.push({
       dataset: ds.key,
       sector: sectorOf(ds.key),
       row: 0,
       severity,
       test: `${STAT}اختلال توزيع الأرقام الأولى (قانون بنفورد)`,
-      detail: `«${label}» في ${t.n} سجلًا: χ² = ${t.chi2.toFixed(1)} ومتوسط الانحراف المطلق ${(t.mad * 100).toFixed(2)}%؛ أكبر انحراف عند الرقم ${t.worst.d} (${t.worst.diff > 0 ? "زيادة" : "نقص"} ${(Math.abs(t.worst.diff) * 100).toFixed(1)} نقطة مئوية). مؤشر يستدعي فحص عينة، وليس دليل تلاعب.`,
+      detail: `«${label}» في ${t.n} سجلًا: χ² = ${t.chi2.toFixed(1)}${multi} ومتوسط الانحراف المطلق ${(t.mad * 100).toFixed(2)}%؛ أكبر انحراف عند الرقم ${t.worst.d} (${t.worst.diff > 0 ? "زيادة" : "نقص"} ${(Math.abs(t.worst.diff) * 100).toFixed(1)} نقطة مئوية). مؤشر يستدعي فحص عينة، وليس دليل تلاعب.`,
     });
   }
   return out;

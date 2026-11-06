@@ -240,12 +240,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
               </div>
             </label>
             {mode === "register" && (
-              <div className="auth-strength" style={{ ...idx(4), "--w": `${strength(password) * 25}%`, "--c": LEVELS[strength(password)].c } as CSSProperties}>
+              <div className="auth-strength" style={{ ...idx(4), "--w": `${strength(password) * 25}%`, "--c": (LEVELS[strength(password)] ?? LEVELS[0]!).c } as CSSProperties}>
                 <i />
               </div>
             )}
             {mode === "register" && (
-              <p className="auth-strength-t">{password ? `قوة الباسورد: ${LEVELS[strength(password)].t}` : ""}</p>
+              <p className="auth-strength-t">{password ? `قوة الباسورد: ${(LEVELS[strength(password)] ?? LEVELS[0]!).t}` : ""}</p>
             )}
             {mode === "register" && (
               <label className="auth-field auth-expand" style={idx(5)}>

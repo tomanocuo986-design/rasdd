@@ -12,11 +12,20 @@ import { createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from "no
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { auditStore, logEvent, verifyChain } from "./audit-log.ts";
-import { can, effectiveRole, isClientEvent, isRole, registrationPolicy, type Role } from "./roles.ts";
+import { clientIp } from "./client-ip.ts";
+import { pgPool } from "./pg-pool.ts";
+import { failStore } from "./rate-limit.ts";
+import { can, effectiveRole, isClientEvent, isElevatedId, isRole, registrationPolicy, type Role } from "./roles.ts";
 
 const COOKIE = "rasd_session";
 const SESSION_MS = 30 * 24 * 3600 * 1000;
-const MAX_ATTEMPTS = 8;
+// حدود الفشل (كل مفتاح يُقفل LOCK_MS بعد بلوغ حدّه):
+//  - الزوج (رقم وظيفي + عنوان): 8. لا يستطيع غريب قفل حساب موظف من عنوان آخر.
+//  - العنوان وحده: 30 (تخمين على حسابات كثيرة من جهاز واحد).
+//  - الرقم الوظيفي وحده: 60 (تخمين موزَّع من عناوين كثيرة)؛ حدّ مرتفع كي لا يسهل استعماله لتعطيل حساب.
+const MAX_PAIR = 8;
+const MAX_IP = 30;
+const MAX_ID = 60;
 const LOCK_MS = 10 * 60 * 1000;
 const ID_RE = /^[A-Za-z0-9\-_.]{3,32}$/;
 
@@ -75,6 +84,10 @@ async function checkPassword(pw: string, stored: string) {
   return k.length === want.length && timingSafeEqual(k, want);
 }
 
+// تجزئة وهمية: عند رقم غير موجود نحسب scrypt كاملاً أيضاً، فلا يفرّق الزمن بين «لا حساب» و«كلمة مرور خاطئة»
+let dummyHash: Promise<string> | undefined;
+const getDummyHash = () => (dummyHash ??= hashPassword(randomBytes(16).toString("hex")));
+
 // ---------- user store ----------
 type User = { employeeId: string; passwordHash: string; createdAt: string; role?: Role };
 interface Store {
@@ -112,18 +125,6 @@ function fileStore(): Store {
     list: async () => Object.values(await read()),
   };
 }
-// مجمّع اتصالات واحد لمخزني المستخدمين والجلسات (كان يُنشأ مجمّع جديد مع كل طلب).
-let sharedPool: Promise<any> | undefined;
-const pgPool = () =>
-  (sharedPool ??= (async () => {
-    // @ts-ignore
-    const { default: pg } = await import("pg");
-    return new pg.Pool({
-      connectionString: env("DATABASE_URL"),
-      ssl: env("DATABASE_SSL") === "require" ? { rejectUnauthorized: false } : undefined,
-    });
-  })());
-
 function pgStore(): Store {
   let ready: Promise<any> | undefined;
   const getPool = () =>
@@ -258,15 +259,16 @@ function pgSessionStore(): SessionStore {
     get: async (sid) => {
       const r = await (await getPool()).query("select * from rasd_sessions where sid=$1", [sid]);
       const x = r.rows[0];
-      return x
-        ? {
-            sid: x.sid,
-            employeeId: x.employee_id,
-            createdAt: new Date(x.created_at).toISOString(),
-            expiresAt: new Date(x.expires_at).getTime(),
-            revokedAt: x.revoked_at ? new Date(x.revoked_at).toISOString() : undefined,
-          }
-        : null;
+      if (!x) return null;
+      const sess: Session = {
+        sid: x.sid,
+        employeeId: x.employee_id,
+        createdAt: new Date(x.created_at).toISOString(),
+        expiresAt: new Date(x.expires_at).getTime(),
+      };
+      // exactOptionalPropertyTypes: لا نضع revokedAt: undefined، بل نضيفه فقط عند وجوده
+      if (x.revoked_at) sess.revokedAt = new Date(x.revoked_at).toISOString();
+      return sess;
     },
     revoke: async (sid) =>
       (await (await getPool()).query("update rasd_sessions set revoked_at=now() where sid=$1 and revoked_at is null and expires_at > now()", [sid]))
@@ -289,17 +291,23 @@ const stores = () => {
 const store = () => stores().users;
 const sessions = () => stores().sessions;
 
-// ---------- rate limiting (in memory) ----------
-const fails = new Map<string, { n: number; until: number }>();
-const locked = (k: string) => {
-  const f = fails.get(k);
-  return !!f && f.n >= MAX_ATTEMPTS && Date.now() < f.until;
+// ---------- rate limiting (PostgreSQL إن وُجد DATABASE_URL، وإلا الذاكرة) ----------
+const failKeys = (id: string, ip: string) => [
+  { k: `pair:${id}|${ip}`, max: MAX_PAIR },
+  { k: `ip:${ip}`, max: MAX_IP },
+  { k: `id:${id}`, max: MAX_ID },
+];
+const anyLocked = async (id: string, ip: string) => {
+  const fs_ = failStore();
+  for (const { k, max } of failKeys(id, ip)) if (await fs_.isLocked(k, max)) return true;
+  return false;
 };
-const noteFail = (k: string) => {
-  const f = fails.get(k);
-  const n = f && Date.now() < f.until ? f.n + 1 : 1;
-  fails.set(k, { n, until: Date.now() + LOCK_MS });
+const noteFails = async (id: string, ip: string) => {
+  const fs_ = failStore();
+  for (const { k } of failKeys(id, ip)) await fs_.note(k, LOCK_MS);
 };
+// عند النجاح نصفّر عدّاد الزوج فقط؛ عدّاد العنوان والرقم يبقيان فلا يمسحهما من يعرف كلمة مرور حساب واحد
+const clearPair = (id: string, ip: string) => failStore().clear(`pair:${id}|${ip}`);
 const normId = (v: unknown) =>
   String(v ?? "")
     .trim()
@@ -443,9 +451,8 @@ export async function handlePost(req: Request) {
     const password = String(body.password ?? "");
     if (!ID_RE.test(employeeId)) return json(400, { error: "invalid_id" });
     if (password.length < 8 || password.length > 200) return json(400, { error: "weak_password" });
-    const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
-    const keys = [`id:${employeeId}`, `ip:${ip}`];
-    if (keys.some(locked)) {
+    const ip = clientIp(req);
+    if (await anyLocked(employeeId, ip)) {
       await logEvent({ actor: employeeId, action: "auth.locked", detail: `ip=${ip}` });
       return json(429, { error: "too_many_attempts" });
     }
@@ -453,11 +460,17 @@ export async function handlePost(req: Request) {
     let created: User | null = null;
     if (body.action === "register") {
       const policy = registrationPolicy();
-      if (policy === "closed") return json(403, { error: "registration_closed" });
-      if (policy === "invite") {
-        const code = String(process.env["AUTH_INVITE_CODE"] ?? "");
+      const elevated = isElevatedId(employeeId);
+      const code = String(process.env["AUTH_INVITE_CODE"] ?? "");
+      // رقم له دور من البيئة (مدير/مراجع): لا يُسجَّل في الوضع المفتوح أبداً، ولا يُسجَّل إلا برمز الدعوة (حتى في الوضع المغلق)
+      if (policy === "open" && elevated) {
+        await logEvent({ actor: employeeId, action: "auth.register_denied", detail: `elevated-in-open ip=${ip}` });
+        return json(403, { error: "invite_required" });
+      }
+      if (policy === "closed" && !(elevated && code)) return json(403, { error: "registration_closed" });
+      if (policy === "invite" || policy === "closed") {
         if (!code || !safeEq(String(body.inviteCode ?? ""), code)) {
-          keys.forEach(noteFail);
+          await noteFails(employeeId, ip);
           await logEvent({ actor: employeeId, action: "auth.register_denied", detail: `ip=${ip}` });
           return json(403, { error: "invite_required" });
         }
@@ -467,18 +480,25 @@ export async function handlePost(req: Request) {
       const passwordHash = await hashPassword(password);
       created = { employeeId, passwordHash, createdAt: new Date().toISOString(), role: "auditor" };
       if (!(await store().create(created))) return json(409, { error: "exists" });
-      await logEvent({ actor: employeeId, role: effectiveRole(created), action: "auth.register", detail: `ip=${ip}` });
+      await logEvent({
+        actor: employeeId,
+        role: effectiveRole(created),
+        action: "auth.register",
+        detail: `ip=${ip}${elevated ? " elevated" : ""}`,
+      });
     } else {
       const user = await store().get(employeeId);
-      if (!user || !(await checkPassword(password, user.passwordHash))) {
-        keys.forEach(noteFail);
+      // الحساب غير الموجود يمرّ بنفس حساب scrypt كي لا يكشف الزمن وجود الرقم الوظيفي
+      const passwordOk = await checkPassword(password, user ? user.passwordHash : await getDummyHash());
+      if (!user || !passwordOk) {
+        await noteFails(employeeId, ip);
         await logEvent({ actor: employeeId, action: "auth.login_failed", detail: `ip=${ip}` });
         return json(401, { error: "wrong_credentials" });
       }
       created = user;
       await logEvent({ actor: employeeId, role: effectiveRole(user), action: "auth.login", detail: `ip=${ip}` });
     }
-    keys.forEach((k) => fails.delete(k));
+    await clearPair(employeeId, ip);
     const sid = newSid();
     const expiresAt = Date.now() + SESSION_MS;
     await sessions().create({ sid, employeeId, createdAt: new Date().toISOString(), expiresAt });

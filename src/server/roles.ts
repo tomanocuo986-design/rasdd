@@ -60,10 +60,19 @@ export type ClientEvent = (typeof CLIENT_EVENTS)[number];
 export const isClientEvent = (v: unknown): v is ClientEvent => (CLIENT_EVENTS as readonly string[]).includes(String(v));
 
 export type RegistrationPolicy = "open" | "invite" | "closed";
-/** closed: لا تسجيل ذاتي. invite: يتطلب AUTH_INVITE_CODE. open: كما كان (للتجارب فقط). */
+/**
+ * closed: لا تسجيل ذاتي (الافتراضي إن لم يُضبط شيء، فالنسيان لا يفتح الباب).
+ * invite: يتطلب AUTH_INVITE_CODE (يكفي ضبطه لتفعيل هذا الوضع).
+ * open  : لا يُفعَّل إلا بكتابة AUTH_REGISTRATION=open صراحةً (للتجارب فقط)، ولا يُسمح فيه بتسجيل رقم له دور من البيئة.
+ */
 export function registrationPolicy(env: Record<string, string | undefined> = process.env): RegistrationPolicy {
   const v = (env["AUTH_REGISTRATION"] ?? "").trim().toLowerCase();
   if (v === "closed") return "closed";
+  if (v === "open") return "open";
   if (v === "invite" || (env["AUTH_INVITE_CODE"] ?? "").trim()) return "invite";
-  return "open";
+  return "closed";
 }
+
+/** هل لهذا الرقم الوظيفي دور مرتفع (مدير/مراجع) من البيئة؟ هذه الأرقام لا تُسجَّل ذاتياً إلا برمز دعوة صحيح. */
+export const isElevatedId = (employeeId: string, env: Record<string, string | undefined> = process.env): boolean =>
+  bootstrapRole(employeeId, env) !== null;

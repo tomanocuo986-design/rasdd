@@ -7,12 +7,13 @@ import { can } from "../server/roles.ts";
 import type { AgentMessage } from "../server/agent.ts";
 import { AGENT_RULES, geminiAgentBody, openaiAgentBody, parseStep, MAX_AGENT_STEPS } from "../server/agent.ts";
 import { providerFromEnv, systemFor } from "../server/llm.ts";
+import { createLimiter } from "../server/rate-limit.ts";
 
 // خطوة واحدة من حلقة الوكيل: يستقبل المحادثة (بما فيها نتائج الأدوات التي نفّذها المتصفح) ويعيد
 // {text, toolCalls}. المتصفح هو من يحلقّ الحلقة وينفّذ الأدوات لأن بيانات التدقيق لا تغادره إلا كملخص.
 
-const RATE_LIMIT = 60; // خطوات لكل دقيقة لكل عنوان (الطلب الواحد قد يستهلك حتى MAX_AGENT_STEPS)
-const buckets = new Map<string, number[]>();
+// حدّ لكل مستخدم مسجَّل (الرقم الوظيفي)، لا لكل عنوان: العنوان يزوّره العميل، والمستخدم لا يستطيع تغيير هويته
+const limited = createLimiter({ max: 60, windowMs: 60_000 }); // خطوات لكل دقيقة لكل مستخدم (الطلب الواحد قد يستهلك حتى MAX_AGENT_STEPS)
 
 const toolCall = z.object({
   id: z.string().min(1).max(120),
@@ -49,21 +50,6 @@ const bodySchema = z.object({
   step: z.number().int().min(1).max(MAX_AGENT_STEPS).optional(),
 });
 
-const clientKey = (r: Request) =>
-  r.headers.get("cf-connecting-ip") ||
-  r.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-  r.headers.get("x-real-ip") ||
-  "anon";
-
-function limited(key: string) {
-  const now = Date.now();
-  const hits = (buckets.get(key) ?? []).filter((t) => now - t < 60_000);
-  hits.push(now);
-  buckets.set(key, hits);
-  if (buckets.size > 5000) buckets.clear();
-  return hits.length > RATE_LIMIT;
-}
-
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
     status,
@@ -85,7 +71,7 @@ export const Route = createFileRoute("/api/agent")({
           void logEvent({ actor: user.employeeId, role: user.role, action: "ai.blocked", detail: "route=agent provider=external" });
           return fail(gate.status, gate.message);
         }
-        if (limited(clientKey(request))) return fail(429, "طلبات كثيرة، حاول بعد دقيقة.");
+        if (limited(user.employeeId)) return fail(429, "طلبات كثيرة، حاول بعد دقيقة.");
 
         let parsed;
         try {

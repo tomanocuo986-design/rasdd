@@ -3,6 +3,7 @@
 //  - مع DATABASE_URL: جدول rasd_audit_log مع مشغّل (trigger) يمنع UPDATE/DELETE على مستوى قاعدة البيانات.
 //  - بدونها: ملف JSONL بوضع الإلحاق فقط في AUTH_DATA_DIR (للتجارب؛ ضع قاعدة بيانات في الإنتاج).
 // لا تُسجَّل هنا بيانات التدقيق نفسها ولا كلمات المرور، بل «من فعل ماذا ومتى» فقط.
+import { pgPool } from "./pg-pool.ts";
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -115,12 +116,7 @@ function pgAuditStore(): AuditStore {
   let pool: Promise<any> | undefined;
   const getPool = () =>
     (pool ??= (async () => {
-      // @ts-ignore - pg is a runtime dependency
-      const { default: pg } = await import("pg");
-      const p = new pg.Pool({
-        connectionString: env("DATABASE_URL"),
-        ssl: env("DATABASE_SSL") === "require" ? { rejectUnauthorized: false } : undefined,
-      });
+      const p = await pgPool();
       await p.query(`create table if not exists rasd_audit_log (
         seq bigint primary key, ts text not null, actor text not null, role text not null, action text not null,
         target text not null, detail text not null, prev_hash text not null, hash text not null)`);
