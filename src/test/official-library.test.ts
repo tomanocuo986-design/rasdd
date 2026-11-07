@@ -4,8 +4,8 @@ import {
   isOfficialDoc,
   syncOfficialLibrary,
   syncSummary,
-} from "@/rasd/official-library.js";
-import type { OfficialDoc } from "@/rasd/official-library.js";
+} from "@/rasd/official-library";
+import type { OfficialDoc } from "@/rasd/official-library";
 
 type Doc = OfficialDoc;
 
@@ -146,6 +146,40 @@ describe("syncOfficialLibrary", () => {
     const r = await syncOfficialLibrary(s.deps);
     expect(r.failed).toBe(1);
     expect(s.db.size).toBe(0);
+  });
+
+  it("does not wipe the local official library when the server returns an empty list", async () => {
+    const existing: Doc[] = [{ id: `${OFFICIAL_PREFIX}a`, official: true, name: "نظام a", text: "x", sha: "s1" }];
+    const s = setup({ items: () => [], existing });
+    await syncOfficialLibrary(s.deps);
+    expect(s.db.has(`${OFFICIAL_PREFIX}a`)).toBe(true);
+  });
+
+  it("counts items the server failed to fetch as failed (once)", async () => {
+    const s = setup({ items: () => [item("a", undefined, { status: "error" })], maxPolls: 3 } as never);
+    const r = await syncOfficialLibrary(s.deps);
+    expect(r.failed).toBe(1);
+  });
+
+  it("rejects a file whose x-sha differs from the listed sha", async () => {
+    const s = setup({ items: () => [item("a", "s1")] });
+    s.deps.fetchImpl.mockImplementation(async (url: string) =>
+      url === "/api/legal-library"
+        ? new Response(JSON.stringify({ enabled: true, items: [item("a", "s1")] }), { status: 200 })
+        : new Response(new Blob(["%PDF-1.7"]), { status: 200, headers: { "x-sha": "other" } }),
+    );
+    const r = await syncOfficialLibrary(s.deps);
+    expect(r.failed).toBe(1);
+    expect(s.db.size).toBe(0);
+  });
+});
+
+describe("needs-review items", () => {
+  it("counts ok items that carry a warning and says so in the summary", async () => {
+    const s = setup({ items: () => [item("a", "s1", { warning: "تغيّر الملف على الموقع الرسمي عن النسخة المعتمدة." }), item("b", "s2")] });
+    const r = await syncOfficialLibrary(s.deps);
+    expect(r.review).toBe(1);
+    expect(syncSummary(r)).toContain("تحتاج مراجعة 1");
   });
 });
 

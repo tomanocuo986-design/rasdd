@@ -72,6 +72,7 @@ function ipv4Private(ip: string): boolean {
     (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b <= 31) ||
     (a === 192 && b === 0 && (c === 0 || c === 2)) ||
+    (a === 192 && b === 88 && c === 99) || // 6to4 relay (مهجور)
     (a === 192 && b === 168) ||
     (a === 198 && (b === 18 || b === 19)) ||
     (a === 198 && b === 51 && c === 100) ||
@@ -128,6 +129,9 @@ function ipv6Private(ip: string): boolean {
     return ipv4Private(`${g6 >> 8}.${g6 & 255}.${g7 >> 8}.${g7 & 255}`);
   if ((g0 & 0xfe00) === 0xfc00) return true; // fc00::/7 (ULA)
   if ((g0 & 0xffc0) === 0xfe80) return true; // fe80::/10 (link-local)
+  if ((g0 & 0xffc0) === 0xfec0) return true; // fec0::/10 (site-local مهجور)
+  if (g0 === 0x0100 && g1 === 0 && g2 === 0 && g3 === 0) return true; // 100::/64 (discard)
+  if (g0 === 0x2001 && g1 === 0) return true; // Teredo: يحمل IPv4 داخله
   if ((g0 & 0xff00) === 0xff00) return true; // ff00::/8 (multicast)
   if (g0 === 0x2001 && g1 === 0x0db8) return true; // توثيق
   if (g0 === 0x0064 && g1 === 0xff9b) return true; // NAT64
@@ -268,6 +272,34 @@ export type Fetched = { ok: true; body: Buffer; finalUrl: string };
 
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
 
+/**
+ * يجرّب العناوين المفحوصة واحداً بعد الآخر (IPv4 أولاً لأن كثيراً من الاستضافات بلا خروج IPv6).
+ * نتجاوز إلى العنوان التالي عند فشل الاتصال فقط؛ أخطاء الشهادة والمهلة وحد الحجم تُرمى فوراً
+ * (فشل الشهادة لا يُعالَج بتجربة عنوان آخر). كل العناوين فُحصت مسبقاً بأنها عامة.
+ */
+async function getFromAny(
+  get: GetFn,
+  url: URL,
+  addrs: Resolved[],
+  opts: { maxBytes: number; timeoutMs: number },
+): Promise<RawResponse> {
+  const ordered = [...addrs].sort((a, b) => a.family - b.family);
+  let last: unknown;
+  for (const a of ordered) {
+    try {
+      return await get(url, a, opts);
+    } catch (e) {
+      if (e instanceof FetchError) throw e;
+      const name = (e as { name?: string })?.name;
+      const code = (e as { code?: string })?.code ?? "";
+      if (name === "AbortError" || name === "TimeoutError" || code === "ABORT_ERR") throw e;
+      if (/CERT|TLS|SSL|ERR_TLS/i.test(code)) throw e;
+      last = e; // ECONNREFUSED / ENETUNREACH / EHOSTUNREACH ... → العنوان التالي
+    }
+  }
+  throw last ?? new Error("no address");
+}
+
 export async function fetchLegalPdf(rawUrl: string, deps: Deps): Promise<Fetched | Reject> {
   const resolve = deps.resolve ?? defaultResolve;
   const get = deps.get ?? defaultGet;
@@ -284,7 +316,7 @@ export async function fetchLegalPdf(rawUrl: string, deps: Deps): Promise<Fetched
       if (!addrs.length) return reject(502, "تعذّر الوصول إلى الموقع.");
       if (addrs.some((a) => isPrivateAddress(a.address)))
         return reject(403, "عنوان الموقع غير مسموح.");
-      const res = await get(url, addrs[0]!, { maxBytes, timeoutMs });
+      const res = await getFromAny(get, url, addrs, { maxBytes, timeoutMs });
 
       if (REDIRECTS.has(res.status)) {
         const loc = res.headers["location"];

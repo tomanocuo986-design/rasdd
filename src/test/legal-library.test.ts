@@ -183,3 +183,92 @@ describe("legal library cache", () => {
     expect(s.lib.file("b")).toBeNull();
   });
 });
+
+describe("legal library: النسخة المعتمدة وميزانية الذاكرة", () => {
+  const mkLib = (cat: CatalogItem[], body: () => string, maxTotalBytes?: number) => {
+    let t = 1_000_000;
+    const lib = createLegalLibrary({
+      catalog: () => cat,
+      fetchPdf: async (url) => ({ ok: true, body: Buffer.from(`%PDF-1.7 ${body()}`), finalUrl: url }),
+      ttlMs: 1000,
+      retryMs: 100,
+      now: () => t,
+      ...(maxTotalBytes ? { maxTotalBytes } : {}),
+    });
+    return { lib, advance: (ms: number) => (t += ms) };
+  };
+
+  it("لا تُستبدل النسخة المحفوظة إن تغيّر الملف عن pinSha، ويظهر السبب", async () => {
+    let content = "v1";
+    const probe = mkLib([A], () => content);
+    probe.lib.list();
+    await flush();
+    const sha = probe.lib.list()[0]!.sha!;
+
+    const pinned: CatalogItem = { ...A, pinSha: sha.slice(0, 16) };
+    const s = mkLib([pinned], () => content);
+    s.lib.list();
+    await flush();
+    expect(s.lib.list()[0]!.status).toBe("ok");
+    content = "v2 تغيّر النص";
+    s.advance(1500);
+    s.lib.list();
+    await flush();
+    const it1 = s.lib.list()[0]!;
+    expect(it1.sha).toBe(sha); // ما زالت المعتمدة
+  });
+
+  it("يُظهر تحذير «تحتاج مراجعة» مع بقاء النسخة المعتمدة صالحة (ولا يُخفيه خلف status=ok)", async () => {
+    let content = "v1";
+    const probe = mkLib([A], () => content);
+    probe.lib.list();
+    await flush();
+    const sha = probe.lib.list()[0]!.sha!;
+    const s = mkLib([{ ...A, pinSha: sha.slice(0, 16) }], () => content);
+    s.lib.list();
+    await flush();
+    expect(s.lib.list()[0]!.warning).toBeUndefined();
+    content = "v2 تغيّر النص";
+    s.advance(1500);
+    s.lib.list();
+    await flush();
+    const it1 = s.lib.list()[0]!;
+    expect(it1.status).toBe("ok");
+    expect(it1.warning).toMatch(/النسخة المعتمدة/);
+    expect(s.lib.file("a")).not.toBeNull();
+  });
+
+  it("يرفض أول نسخة لا تطابق pinSha", async () => {
+    const s = mkLib([{ ...A, pinSha: "00000000" }], () => "v1");
+    s.lib.list();
+    await flush();
+    const it1 = s.lib.list()[0]!;
+    expect(it1.status).toBe("error");
+    expect(it1.error).toMatch(/النسخة المعتمدة/);
+    expect(s.lib.file("a")).toBeNull();
+  });
+
+  it("يلتزم بسقف مجموع الذاكرة", async () => {
+    const big = "x".repeat(60);
+    const s = mkLib([A, B], () => big, 100); // يتّسع لملف واحد فقط
+    s.lib.list();
+    await flush();
+    const st = s.lib.list().map((i) => i.status).sort();
+    expect(st).toEqual(["error", "ok"]);
+  });
+
+  it("LEGAL_CATALOG_EXTRA يقبل pinSha صالحاً فقط", () => {
+    const cat = loadCatalog(
+      {
+        LEGAL_CATALOG_EXTRA: JSON.stringify([
+          { title: "س", url: "https://csb.gov.jo/1.pdf", pinSha: "ABCDEF0123456789" },
+          { title: "ص", url: "https://csb.gov.jo/2.pdf", pinSha: "zzz" },
+        ]),
+      },
+      HOSTS,
+    );
+    const extra = cat.slice(DEFAULT_CATALOG.length);
+    expect(extra[0]!.pinSha).toBe("abcdef0123456789");
+    expect(extra[1]!.pinSha).toBeUndefined();
+  });
+});

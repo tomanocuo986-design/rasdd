@@ -10,10 +10,14 @@ import { encryptStream } from "../../scripts/offline/pack-format.mjs";
 // بكلمة مرور يختارها المستخدم، وتُسلَّم في ملف zip فيه المشغّل. لا تُحفظ الكلمة ولا تُسجَّل.
 // انظر docs/OFFLINE_PACKAGE.ar.md.
 
-export const MIN_PASSWORD = 10;
+export const MIN_PASSWORD = 12;
 export const MAX_PASSWORD = 128;
 
 export const offlineEnabled = () => process.env.OFFLINE_PACKAGE !== "off";
+
+/** من يحق له تنزيل النسخة: المدير فقط افتراضياً. OFFLINE_PACKAGE_ALLOW_ALL=1 يعيدها لكل مستخدم مسجّل. */
+export const offlineAllowedFor = (isAdmin: boolean, env: NodeJS.ProcessEnv = process.env) =>
+  isAdmin || env.OFFLINE_PACKAGE_ALLOW_ALL === "1";
 const packageDir = () => path.resolve(process.env.OFFLINE_PACKAGE_DIR || path.join(process.cwd(), "offline-dist"));
 
 export type OfflineStatus = {
@@ -39,13 +43,19 @@ export async function offlineStatus(): Promise<OfflineStatus> {
   }
 }
 
+// أنماط شائعة يسهل تخمينها دون اتصال (الحزمة المنزَّلة تُهاجَم خارج الخادم بلا حد محاولات).
+const WEAK = ["password", "qwerty", "123456", "abcdef", "rasd", "رصد", "12345678", "iloveyou", "admin"];
+
 /** يعيد نص الخطأ بالعربية أو null إن كانت الكلمة مقبولة. */
 export function passwordProblem(pw: unknown): string | null {
   if (typeof pw !== "string") return "أدخل كلمة مرور.";
   if (pw.length < MIN_PASSWORD) return `كلمة المرور قصيرة: ${MIN_PASSWORD} أحرف على الأقل.`;
   if (pw.length > MAX_PASSWORD) return `كلمة المرور طويلة: ${MAX_PASSWORD} حرفاً كحد أقصى.`;
   if (!pw.trim()) return "كلمة المرور لا يمكن أن تكون فراغات فقط.";
-  if (new Set(pw).size < 4) return "كلمة المرور سهلة التخمين: نوّع الأحرف.";
+  if (new Set(pw).size < 6) return "كلمة المرور سهلة التخمين: نوّع الأحرف.";
+  if (/^\d+$/.test(pw)) return "كلمة المرور سهلة التخمين: لا تكتفِ بالأرقام.";
+  const low = pw.toLowerCase();
+  if (WEAK.some((w) => low.includes(w))) return "كلمة المرور سهلة التخمين: تحوي نمطاً شائعاً.";
   return null;
 }
 
@@ -87,8 +97,11 @@ export async function buildOfflineZip(password: string): Promise<{ body: Buffer;
     const top = zip.folder("rasd-offline")!;
     top.file("rasd-app.enc", enc, { compression: "STORE" });
     const add = async (rel: string) => {
-      const data = await readFile(path.join(launcherDir, rel));
+      let data = await readFile(path.join(launcherDir, rel));
       const exec = /\.(command|sh)$/.test(rel);
+      // .bat بنهايات CRLF (cmd.exe)، وسكربتات sh/command بنهايات LF مهما كان ما خزّنه Git
+      if (/\.(bat|cmd)$/i.test(rel)) data = Buffer.from(data.toString("utf8").replace(/\r?\n/g, "\r\n"), "utf8");
+      else if (exec) data = Buffer.from(data.toString("utf8").replace(/\r\n/g, "\n"), "utf8");
       top.file(rel, data, { unixPermissions: exec ? 0o755 : 0o644 });
     };
     for (const name of await readdir(launcherDir)) {

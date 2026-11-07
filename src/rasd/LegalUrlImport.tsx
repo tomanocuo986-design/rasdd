@@ -8,25 +8,7 @@ const FALLBACK_HOSTS = [
   "gtd.gov.jo",
   "modee.gov.jo",
   "portal.jordan.gov.jo",
-];
-
-/** أنظمة وتعليمات جاهزة بروابط رسمية: تُجلب بضغطة واحدة بنفس مسار الرابط اليدوي (فحص الموقع والحجم و%PDF-). */
-export const OFFICIAL_PRESETS = [
-  {
-    id: "procurement-regulation",
-    title: "نظام المشتريات الحكومية رقم (8) لسنة 2022",
-    url: "https://modee.gov.jo/ebv4.0/root_storage/ar/eb_list_page/نظام_المشتريات_الحكومية_رقم_(8)_لسنة_2022.pdf",
-  },
-  {
-    id: "procurement-instructions",
-    title: "تعليمات تنظيم إجراءات المشتريات الحكومية لسنة 2022",
-    url: "https://portal.jordan.gov.jo/OD/files/7003.pdf",
-  },
-  {
-    id: "civil-service-regulation",
-    title: "نظام الخدمة المدنية رقم (9) لسنة 2020",
-    url: "https://portal.jordan.gov.jo/OD/files/6983.pdf",
-  },
+  "spac.gov.jo",
 ];
 
 /** اسم الملف من آخر جزء في مسار الرابط (يفكّ الترميز العربي ويحذف .pdf). */
@@ -60,8 +42,6 @@ export function LegalUrlImport({ onFile, disabled }) {
   const [enabled, setEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  const [busyId, setBusyId] = useState("");
-  const [done, setDone] = useState(new Set());
 
   useEffect(() => {
     let alive = true;
@@ -118,66 +98,9 @@ export function LegalUrlImport({ onFile, disabled }) {
     }
   }
 
-  async function addPreset(p) {
-    setErr("");
-    setBusyId(p.id);
-    try {
-      await importOne(p.url, p.title);
-      setDone((d) => new Set(d).add(p.id));
-    } catch (e) {
-      setErr(`${p.title}: ${e?.fromServer ? e.message : "تعذّر الاتصال بالخادم."}`);
-    } finally {
-      setBusyId("");
-    }
-  }
-
-  async function addAllPresets() {
-    for (const p of OFFICIAL_PRESETS) {
-      if (done.has(p.id)) continue;
-      await addPreset(p);
-    }
-  }
-
   if (!enabled) return null;
   return (
     <div className="mt-3 grid gap-1 text-xs" data-testid="legal-url-import">
-      <div className="mb-2 grid gap-1" data-testid="legal-presets">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="font-medium">أنظمة وتعليمات جاهزة (من المواقع الرسمية)</p>
-          <button
-            type="button"
-            className="rounded-md border px-3 py-1"
-            disabled={
-              disabled || loading || !!busyId || OFFICIAL_PRESETS.every((p) => done.has(p.id))
-            }
-            onClick={addAllPresets}
-          >
-            إضافة الكل
-          </button>
-        </div>
-        <ul className="grid gap-1">
-          {OFFICIAL_PRESETS.map((p) => (
-            <li
-              key={p.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-2 py-1"
-            >
-              <span>{p.title}</span>
-              <button
-                type="button"
-                className="rounded-md border px-3 py-0.5"
-                aria-label={`إضافة ${p.title}`}
-                disabled={disabled || loading || !!busyId || done.has(p.id)}
-                onClick={() => addPreset(p)}
-              >
-                {busyId === p.id ? "جارٍ الجلب…" : done.has(p.id) ? "أُضيف" : "إضافة"}
-              </button>
-            </li>
-          ))}
-        </ul>
-        <p className="text-muted-foreground">
-          تأكد من أن النسخة هي السارية وأدخل تاريخ نفاذها بعد الإضافة.
-        </p>
-      </div>
       <div className="flex flex-wrap items-center gap-2">
         <input
           dir="ltr"

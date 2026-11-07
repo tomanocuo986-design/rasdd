@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { LegalUrlImport, OFFICIAL_PRESETS, nameFromUrl } from "@/rasd/LegalUrlImport.tsx";
+import { LegalUrlImport, nameFromUrl } from "@/rasd/LegalUrlImport.tsx";
 
 const HOSTS6 = [
   "mola.gov.jo",
@@ -117,36 +117,5 @@ describe("LegalUrlImport", () => {
     );
     render(<LegalUrlImport onFile={async () => {}} />);
     await waitFor(() => expect(screen.queryByTestId("legal-url-import")).toBeNull());
-  });
-  it("lists the ready-made official regulations and imports one with its title as the file name", async () => {
-    const f = mockFetch(() => new Response(pdfBlob(), { status: 200 }), HOSTS6);
-    const onFile = vi.fn(async () => {});
-    render(<LegalUrlImport onFile={onFile} />);
-    const first = OFFICIAL_PRESETS[0]!;
-    fireEvent.click(screen.getByRole("button", { name: `إضافة ${first.title}` }));
-    await waitFor(() => expect(onFile).toHaveBeenCalledTimes(1));
-    const [file] = onFile.mock.calls[0] as unknown as [File];
-    expect(file.name).toBe(`${first.title}.pdf`);
-    const post = f.mock.calls.find(([, init]) => init?.method === "POST")!;
-    expect(JSON.parse(String(post[1]!.body))).toEqual({ url: first.url });
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: `إضافة ${first.title}` })).toBeDisabled(),
-    );
-  });
-
-  it("adds all presets one after another", async () => {
-    mockFetch(() => new Response(pdfBlob(), { status: 200 }), HOSTS6);
-    const onFile = vi.fn(async () => {});
-    render(<LegalUrlImport onFile={onFile} />);
-    fireEvent.click(screen.getByRole("button", { name: "إضافة الكل" }));
-    await waitFor(() => expect(onFile).toHaveBeenCalledTimes(OFFICIAL_PRESETS.length));
-  });
-
-  it("every preset URL is https on an allowed host", () => {
-    for (const p of OFFICIAL_PRESETS) {
-      const u = new URL(p.url);
-      expect(u.protocol).toBe("https:");
-      expect(HOSTS6.some((h) => u.hostname === h || u.hostname.endsWith("." + h))).toBe(true);
-    }
   });
 });

@@ -1,28 +1,23 @@
+#!/usr/bin/env node
+// تشغيل الخادم المبني (npm run build ثم npm start). nitro يقرأ PORT / NITRO_PORT و HOST / NITRO_HOST.
+import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const entry = resolve(".output/server/index.mjs");
+const root = path.dirname(fileURLToPath(import.meta.url));
+const ENTRIES = [".output/server/index.mjs", ".output/server/index.js"];
+const entry = ENTRIES.map((e) => path.join(root, e)).find((p) => existsSync(p));
 
-process.env.npm_config_cache ??= "/tmp/npm-cache";
-process.env.PORT ??= process.env.SERVER_PORT || "3000";
-process.env.NITRO_PORT ??= process.env.PORT;
-process.env.HOST ??= "0.0.0.0";
-process.env.NITRO_HOST ??= process.env.HOST;
-
-if (!existsSync(entry)) {
-  const r = spawnSync("npx", ["vite", "build"], {
-    stdio: "inherit",
-    shell: true,
-    env: { ...process.env, NITRO_PRESET: "node-server" },
-  });
-  if (r.status !== 0) process.exit(r.status ?? 1);
-}
-
-if (!existsSync(entry)) {
-  console.error("Build failed: .output/server/index.mjs not found");
+if (!entry) {
+  console.error("لم أجد ناتج البناء (.output/server/index.mjs). شغّل `npm run build` أولاً.");
   process.exit(1);
 }
 
-await import(pathToFileURL(entry).href);
+const child = spawn(process.execPath, [entry], {
+  cwd: root,
+  stdio: "inherit",
+  env: { NODE_ENV: "production", ...process.env },
+});
+for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => child.kill(sig));
+child.on("exit", (code, signal) => process.exit(code ?? (signal ? 1 : 0)));

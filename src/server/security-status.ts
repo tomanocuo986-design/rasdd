@@ -1,6 +1,12 @@
 import { externalAllowed, redactTerms } from "./ai-policy.ts";
 import { isExternalProvider } from "./doc-review.ts";
-import { DEFAULT_ALLOWED_HOSTS, allowedHosts, legalFetchEnabled } from "./legal-fetch.ts";
+import net from "node:net";
+import {
+  DEFAULT_ALLOWED_HOSTS,
+  allowedHosts,
+  isPrivateAddress,
+  legalFetchEnabled,
+} from "./legal-fetch.ts";
 import { loadCatalog, libraryEnabled } from "./legal-library.ts";
 import { providerFromEnv } from "./llm.ts";
 
@@ -71,6 +77,36 @@ export function securityStatus(env: Env = process.env): SecurityStatus {
   }
   if (kind === "local" && !redactAlways)
     info("AI_REDACT_ALWAYS غير مفعّل: لا يُحجب النص عند النموذج المحلي. مقبول إن كان داخل شبكتك.");
+  const instances = Math.max(Number(env["WEB_CONCURRENCY"]) || 1, Number(env["RASD_INSTANCES"]) || 1);
+  if (instances > 1)
+    warn(
+      `أكثر من نسخة خادم (${instances}): حدود الطلبات والمكتبة الرسمية والجلسات المؤقتة تعيش في ذاكرة كل نسخة على حدة. شغّل نسخة واحدة أو انقلها إلى مخزن مشترك.`,
+    );
+  // قالب deploy/secure.env.example كان يضع أسماء مثالاً؛ تُحسب مصطلحات فعلية فيبدو الحجب مضبوطاً وهو غير ذلك.
+  if (/اسم\s+(?:جهة|مورد|موظف)/.test(env["AI_REDACT_TERMS"] ?? ""))
+    warn(
+      "AI_REDACT_TERMS ما زال يحوي أمثلة القالب (اسم جهة/اسم مورد/اسم موظف): ضع الأسماء الحقيقية وإلا فلا يُحجب شيء فعلياً.",
+    );
+  const model = (env["LLM_MODEL"] ?? "").trim();
+  if ((env["LLM_BASE_URL"] ?? "").trim() && (!model || model.startsWith("<")))
+    warn("LLM_MODEL غير مضبوط أو ما زال نص القالب: اكتب اسم النموذج كما يظهر في خادمك.");
+  if (provider && "baseUrl" in provider) {
+    let u: URL | undefined;
+    try {
+      u = new URL(provider.baseUrl);
+    } catch {
+      u = undefined;
+    }
+    const bare = u ? u.hostname.replace(/^\[|\]$/g, "") : ""; // IPv6 يأتي بين أقواس: [::1]
+    if (u && u.protocol === "http:" && net.isIP(bare) && !isPrivateAddress(bare))
+      warn(
+        `عنوان النموذج http إلى عنوان عام (${bare}): الاتصال غير مشفّر ويخرج من شبكتك. استعمل https أو عنواناً داخلياً.`,
+      );
+  }
+  if (kind === "external" && allowExternal && provider?.kind === "gemini")
+    warn(
+      "تأكد أن مفتاح Gemini من مشروع بفوترة مفعّلة (الطبقة المدفوعة): توثيق Google ينص على أن بيانات المدفوعة لا تُستعمل لتحسين منتجاتها ولا ينص على ذلك للمجانية. الأسلم نموذج محلي.",
+    );
   if (libOn) info(`المكتبة الرسمية مفعّلة: يخرج الخادم إلى هذه النطاقات فقط: ${hosts.join("، ")}.`);
   else info("المكتبة الرسمية معطّلة: لا خروج للإنترنت من مسار جلب الأنظمة.");
   if (extraHosts.length)
