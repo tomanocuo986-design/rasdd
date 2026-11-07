@@ -1,0 +1,19 @@
+{
+  "name": "رصد | ذكاء البيانات",
+  "short_name": "رصد",
+  "description": "مساحة رصد لتحليل بيانات الأنشطة والعمليات والتدقيق المبني على المخاطر — تعمل بدون إنترنت",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "dir": "rtl",
+  "lang": "ar",
+  "background_color": "#0F172A",
+  "theme_color": "#0F172A",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ]
+}

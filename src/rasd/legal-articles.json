@@ -1,0 +1,22 @@
+{
+  "_readme": "ارقام المواد لكل صك. عبّئها من النسخة المعتمدة لدى جهتك (بعد مراجعة قانونية). مفتاح الصك كما في INSTRUMENTS داخل legal-framework.js، ومفتاح القاعدة كما في RULES. ما يبقى فارغًا يظهر كـ «تحتاج تحقق».",
+  "jurisdiction": "الأردن - البلديات",
+  "version_date": "",
+  "verified_by": "",
+  "rules": {
+    "conflict": { "articles": "" },
+    "sod": { "articles": "" },
+    "splitting": { "articles": "" },
+    "tender": { "articles": "" },
+    "direct-purchase": { "articles": "" },
+    "engineering": { "articles": "" },
+    "fleet": { "articles": "" },
+    "hr-wagers": { "articles": "" },
+    "hr": { "articles": "" },
+    "aging": { "articles": "" },
+    "revenue": { "articles": "" },
+    "advances": { "articles": "" },
+    "stores": { "articles": "" },
+    "cash": { "articles": "" }
+  }
+}

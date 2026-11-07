@@ -1,0 +1,19 @@
+{
+  "_readme": "أوزان مطابقة تضارب المصالح (مورد ↔ موظف) ودرجة الثقة. مشتركة بين محرك JS (conflict-match.js) ومحرك Python (conflict.py). الثقة = 1 − ∏(1 − وزن كل مؤشر متطابق)، فتتراكم المؤشرات دون أن تتجاوز 100%.",
+  "weights": {
+    "national_id": 0.95,
+    "account": 0.85,
+    "phone": 0.7,
+    "address": 0.45,
+    "name": 0.4
+  },
+  "national_id": {
+    "min_length": 8,
+    "max_length": 12,
+    "standard_length": 10,
+    "nonstandard_factor": 0.75
+  },
+  "conflicting_national_id_factor": 0.35,
+  "bands": { "high": 0.65, "medium": 0.4 },
+  "min_report": 0.15
+}

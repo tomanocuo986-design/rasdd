@@ -1,0 +1,2068 @@
+{
+ "sectors": [
+  {
+   "key": "finance",
+   "label": "الأنشطة والعمليات المالية والمحاسبية",
+   "datasets": [
+    {
+     "key": "Receipt_Vouchers",
+     "label": "سندات القبض",
+     "fields": [
+      {
+       "key": "voucher_no",
+       "label": "رقم سند القبض",
+       "type": "text"
+      },
+      {
+       "key": "date",
+       "label": "تاريخ القبض",
+       "type": "date"
+      },
+      {
+       "key": "amount",
+       "label": "المبلغ المقبوض",
+       "type": "number"
+      },
+      {
+       "key": "payer",
+       "label": "المقبوض منه",
+       "type": "text"
+      },
+      {
+       "key": "revenue_type",
+       "label": "نوع الإيراد / الغرض",
+       "type": "text"
+      },
+      {
+       "key": "credit_account",
+       "label": "الحساب الدائن",
+       "type": "text"
+      },
+      {
+       "key": "method",
+       "label": "طريقة القبض (نقدي / شيك / تحويل)",
+       "type": "text"
+      },
+      {
+       "key": "cheque_no",
+       "label": "رقم الشيك",
+       "type": "text"
+      },
+      {
+       "key": "cheque_status",
+       "label": "حالة الشيك (معلق / محصل / مرتجع / بدون رصيد)",
+       "type": "text"
+      },
+      {
+       "key": "deposit_date",
+       "label": "تاريخ الإيداع البنكي",
+       "type": "date"
+      },
+      {
+       "key": "deposited_amount",
+       "label": "المبلغ المودع",
+       "type": "number"
+      },
+      {
+       "key": "deposit_ref",
+       "label": "رقم إشعار الإيداع",
+       "type": "text"
+      },
+      {
+       "key": "status",
+       "label": "حالة السند (معتمد / ملغى)",
+       "type": "text"
+      },
+      {
+       "key": "cancel_reason",
+       "label": "سبب الإلغاء",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "voucher_no",
+      "date",
+      "amount",
+      "payer"
+     ]
+    },
+    {
+     "key": "Payment_Vouchers",
+     "label": "سندات الصرف",
+     "fields": [
+      {
+       "key": "voucher_no",
+       "label": "رقم سند الصرف",
+       "type": "text"
+      },
+      {
+       "key": "date",
+       "label": "التاريخ",
+       "type": "date"
+      },
+      {
+       "key": "amount",
+       "label": "المبلغ",
+       "type": "number"
+      },
+      {
+       "key": "payee",
+       "label": "الحساب المدفوع له",
+       "type": "text"
+      },
+      {
+       "key": "budget_item",
+       "label": "بند الموازنة المقابل",
+       "type": "text"
+      },
+      {
+       "key": "method",
+       "label": "طريقة الصرف",
+       "type": "text"
+      },
+      {
+       "key": "support_doc",
+       "label": "رقم المستند المعزز",
+       "type": "text"
+      },
+      {
+       "key": "approver",
+       "label": "معتمد الصرف",
+       "type": "text"
+      },
+      {
+       "key": "status",
+       "label": "حالة السند (معتمد / ملغى)",
+       "type": "text"
+      },
+      {
+       "key": "cancel_reason",
+       "label": "سبب الإلغاء",
+       "type": "text"
+      },
+      {
+       "key": "entered_by",
+       "label": "مُدخل السند",
+       "type": "text"
+      },
+      {
+       "key": "paid_by",
+       "label": "منفّذ الصرف",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "voucher_no",
+      "date",
+      "amount",
+      "payee"
+     ]
+    },
+    {
+     "key": "Trial_Balance",
+     "label": "ميزان المراجعة",
+     "fields": [
+      {
+       "key": "account_no",
+       "label": "رقم الحساب",
+       "type": "text"
+      },
+      {
+       "key": "account_name",
+       "label": "اسم الحساب",
+       "type": "text"
+      },
+      {
+       "key": "opening",
+       "label": "رصيد أول المدة",
+       "type": "number"
+      },
+      {
+       "key": "debit",
+       "label": "حركات المدين",
+       "type": "number"
+      },
+      {
+       "key": "credit",
+       "label": "حركات الدائن",
+       "type": "number"
+      },
+      {
+       "key": "closing",
+       "label": "الرصيد الختامي",
+       "type": "number"
+      },
+      {
+       "key": "nature",
+       "label": "طبيعة الرصيد",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "account_no",
+      "account_name"
+     ]
+    },
+    {
+     "key": "Adjustments",
+     "label": "قيود التسوية",
+     "fields": [
+      {
+       "key": "entry_no",
+       "label": "رقم قيد التسوية",
+       "type": "text"
+      },
+      {
+       "key": "date",
+       "label": "التاريخ",
+       "type": "date"
+      },
+      {
+       "key": "debit_account",
+       "label": "الحساب المدين",
+       "type": "text"
+      },
+      {
+       "key": "credit_account",
+       "label": "الحساب الدائن",
+       "type": "text"
+      },
+      {
+       "key": "amount",
+       "label": "قيمة التعديل",
+       "type": "number"
+      },
+      {
+       "key": "reason",
+       "label": "سبب التسوية",
+       "type": "text"
+      },
+      {
+       "key": "requester",
+       "label": "الجهة الطالبة",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "entry_no",
+      "date",
+      "amount"
+     ]
+    },
+    {
+     "key": "Bank_Reconciliations",
+     "label": "التسويات البنكية",
+     "fields": [
+      {
+       "key": "bank_account",
+       "label": "اسم البنك ورقم الحساب",
+       "type": "text"
+      },
+      {
+       "key": "statement_date",
+       "label": "تاريخ الكشف",
+       "type": "date"
+      },
+      {
+       "key": "bank_balance",
+       "label": "الرصيد حسب البنك",
+       "type": "number"
+      },
+      {
+       "key": "book_balance",
+       "label": "الرصيد حسب الدفاتر",
+       "type": "number"
+      },
+      {
+       "key": "outstanding_checks",
+       "label": "الشيكات المعلقة",
+       "type": "number"
+      },
+      {
+       "key": "oldest_check_date",
+       "label": "تاريخ أقدم شيك معلق",
+       "type": "date"
+      },
+      {
+       "key": "deposits_in_transit",
+       "label": "الإيداعات بالطريق",
+       "type": "number"
+      },
+      {
+       "key": "bank_charges",
+       "label": "عمولات ومصاريف بنكية غير مسجلة",
+       "type": "number"
+      },
+      {
+       "key": "unrecorded_credits",
+       "label": "إيداعات بنكية غير مسجلة بالدفاتر",
+       "type": "number"
+      },
+      {
+       "key": "difference",
+       "label": "فروقات التسوية",
+       "type": "number"
+      },
+      {
+       "key": "prepared_by",
+       "label": "معد التسوية",
+       "type": "text"
+      },
+      {
+       "key": "reviewed_by",
+       "label": "مراجع التسوية",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "bank_account",
+      "statement_date"
+     ]
+    },
+    {
+     "key": "Petty_Cash",
+     "label": "الصناديق والعهد النقدية",
+     "fields": [
+      {
+       "key": "box",
+       "label": "رقم الصندوق / أمين الصندوق",
+       "type": "text"
+      },
+      {
+       "key": "approved",
+       "label": "قيمة العهدة المعتمدة",
+       "type": "number"
+      },
+      {
+       "key": "actual",
+       "label": "الرصيد الفعلي بالصندوق",
+       "type": "number"
+      },
+      {
+       "key": "unsettled_docs",
+       "label": "المستندات غير المسواة",
+       "type": "number"
+      },
+      {
+       "key": "last_replenish",
+       "label": "تاريخ آخر استعاضة",
+       "type": "date"
+      },
+      {
+       "key": "last_count",
+       "label": "تاريخ آخر جرد مفاجئ",
+       "type": "date"
+      },
+      {
+       "key": "counted_by",
+       "label": "القائم بالجرد",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "box"
+     ]
+    },
+    {
+     "key": "Clearing_Accounts",
+     "label": "الحسابات الوسيطة",
+     "fields": [
+      {
+       "key": "account_no",
+       "label": "رقم الحساب الوسيط",
+       "type": "text"
+      },
+      {
+       "key": "account_name",
+       "label": "اسم الحساب",
+       "type": "text"
+      },
+      {
+       "key": "date",
+       "label": "تاريخ الحركة",
+       "type": "date"
+      },
+      {
+       "key": "amount",
+       "label": "المبلغ",
+       "type": "number"
+      },
+      {
+       "key": "reason",
+       "label": "سبب التعليق",
+       "type": "text"
+      },
+      {
+       "key": "target_close",
+       "label": "تاريخ الإغلاق المستهدف",
+       "type": "date"
+      }
+     ],
+     "required": [
+      "account_no",
+      "date",
+      "amount"
+     ]
+    },
+    {
+     "key": "Revenue_Profession_Licenses",
+     "label": "رخص المهن والصناعات",
+     "fields": [
+      {
+       "key": "license_no",
+       "label": "رقم الرخصة",
+       "type": "text"
+      },
+      {
+       "key": "date",
+       "label": "تاريخ الإصدار",
+       "type": "date"
+      },
+      {
+       "key": "owner",
+       "label": "اسم صاحب المنشأة",
+       "type": "text"
+      },
+      {
+       "key": "profession",
+       "label": "المهنة / الصناعة",
+       "type": "text"
+      },
+      {
+       "key": "fee_due",
+       "label": "الرسوم المستحقة",
+       "type": "number"
+      },
+      {
+       "key": "fee_paid",
+       "label": "الرسوم المحصلة",
+       "type": "number"
+      },
+      {
+       "key": "receipt_no",
+       "label": "رقم سند القبض",
+       "type": "text"
+      },
+      {
+       "key": "bank_deposit",
+       "label": "المبلغ الواصل للحساب البنكي",
+       "type": "number"
+      },
+      {
+       "key": "status",
+       "label": "حالة الرخصة",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "license_no",
+      "owner",
+      "fee_due"
+     ]
+    },
+    {
+     "key": "Revenue_Property_Taxes_Regulation",
+     "label": "عوائد التنظيم والتعبيد والمسقفات",
+     "fields": [
+      {
+       "key": "parcel_no",
+       "label": "رقم القطعة / المكلف",
+       "type": "text"
+      },
+      {
+       "key": "owner",
+       "label": "اسم المكلف",
+       "type": "text"
+      },
+      {
+       "key": "tax_type",
+       "label": "نوع العائد (تنظيم / تعبيد / مسقفات / أبراضي)",
+       "type": "text"
+      },
+      {
+       "key": "year",
+       "label": "السنة المالية",
+       "type": "text"
+      },
+      {
+       "key": "amount_due",
+       "label": "المبلغ المستحق",
+       "type": "number"
+      },
+      {
+       "key": "amount_paid",
+       "label": "المبلغ المحصل",
+       "type": "number"
+      },
+      {
+       "key": "receipt_no",
+       "label": "رقم سند القبض",
+       "type": "text"
+      },
+      {
+       "key": "bank_deposit",
+       "label": "المبلغ الواصل للحساب البنكي",
+       "type": "number"
+      },
+      {
+       "key": "last_payment",
+       "label": "تاريخ آخر تحصيل",
+       "type": "date"
+      }
+     ],
+     "required": [
+      "parcel_no",
+      "owner",
+      "amount_due"
+     ]
+    },
+    {
+     "key": "Revenue_Municipal_Properties_Leases",
+     "label": "عقود تأجير الأملاك البلدية",
+     "fields": [
+      {
+       "key": "contract_no",
+       "label": "رقم العقد",
+       "type": "text"
+      },
+      {
+       "key": "property",
+       "label": "العقار (محل / مخزن / كشك / سوق)",
+       "type": "text"
+      },
+      {
+       "key": "tenant",
+       "label": "المستأجر",
+       "type": "text"
+      },
+      {
+       "key": "start_date",
+       "label": "تاريخ بدء العقد",
+       "type": "date"
+      },
+      {
+       "key": "end_date",
+       "label": "تاريخ انتهاء العقد",
+       "type": "date"
+      },
+      {
+       "key": "installment",
+       "label": "قيمة القسط",
+       "type": "number"
+      },
+      {
+       "key": "due_date",
+       "label": "تاريخ استحقاق القسط",
+       "type": "date"
+      },
+      {
+       "key": "paid_date",
+       "label": "تاريخ السداد الفعلي",
+       "type": "date"
+      },
+      {
+       "key": "paid_amount",
+       "label": "المبلغ المسدد",
+       "type": "number"
+      },
+      {
+       "key": "receipt_no",
+       "label": "رقم سند القبض",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "contract_no",
+      "tenant"
+     ]
+    },
+    {
+     "key": "Revenue_Daily_Fees",
+     "label": "رسوم الخدمات اليومية",
+     "fields": [
+      {
+       "key": "date",
+       "label": "التاريخ",
+       "type": "date"
+      },
+      {
+       "key": "service",
+       "label": "الخدمة (مسلخ / سوق مركزي / أذونات حفر / مواقف)",
+       "type": "text"
+      },
+      {
+       "key": "receipt_book",
+       "label": "رقم الوصل / الدفتر",
+       "type": "text"
+      },
+      {
+       "key": "amount_due",
+       "label": "المبلغ المستحق",
+       "type": "number"
+      },
+      {
+       "key": "amount_collected",
+       "label": "المبلغ المحصل",
+       "type": "number"
+      },
+      {
+       "key": "collector",
+       "label": "المحصّل",
+       "type": "text"
+      },
+      {
+       "key": "deposit_date",
+       "label": "تاريخ التوريد",
+       "type": "date"
+      },
+      {
+       "key": "deposited_amount",
+       "label": "المبلغ المورد",
+       "type": "number"
+      }
+     ],
+     "required": [
+      "date",
+      "amount_due"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "hr",
+   "label": "أنشطة وعمليات الموارد البشرية والرواتب",
+   "datasets": [
+    {
+     "key": "HR_Establishment_Table",
+     "label": "جدول التشكيلات المعتمد",
+     "fields": [
+      {
+       "key": "position_no",
+       "label": "رقم الوظيفة",
+       "type": "text"
+      },
+      {
+       "key": "title",
+       "label": "المسمى الوظيفي المعتمد",
+       "type": "text"
+      },
+      {
+       "key": "grade",
+       "label": "الدرجة المقررة",
+       "type": "text"
+      },
+      {
+       "key": "department",
+       "label": "القسم / المديرية",
+       "type": "text"
+      },
+      {
+       "key": "annual_allocation",
+       "label": "المخصص المالي السنوي",
+       "type": "number"
+      },
+      {
+       "key": "notes",
+       "label": "ملاحظات",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "position_no",
+      "title"
+     ]
+    },
+    {
+     "key": "HR_Payroll_Sheets",
+     "label": "كشوفات الرواتب",
+     "fields": [
+      {
+       "key": "employee_no",
+       "label": "الرقم الوظيفي",
+       "type": "text"
+      },
+      {
+       "key": "name",
+       "label": "اسم الموظف",
+       "type": "text"
+      },
+      {
+       "key": "national_id",
+       "label": "الرقم الوطني",
+       "type": "text"
+      },
+      {
+       "key": "position_no",
+       "label": "رقم الوظيفة",
+       "type": "text"
+      },
+      {
+       "key": "title",
+       "label": "المسمى الوظيفي الفعلي",
+       "type": "text"
+      },
+      {
+       "key": "grade",
+       "label": "الدرجة الممنوحة",
+       "type": "text"
+      },
+      {
+       "key": "hire_date",
+       "label": "تاريخ التعيين",
+       "type": "date"
+      },
+      {
+       "key": "appointment_decision",
+       "label": "رقم قرار التعيين",
+       "type": "text"
+      },
+      {
+       "key": "status",
+       "label": "حالة الموظف (على رأس العمل / منقطع / موقوف ...)",
+       "type": "text"
+      },
+      {
+       "key": "attendance_days",
+       "label": "أيام الحضور الفعلية",
+       "type": "number"
+      },
+      {
+       "key": "bank_account",
+       "label": "رقم الحساب البنكي / IBAN",
+       "type": "text"
+      },
+      {
+       "key": "basic",
+       "label": "الراتب الأساسي",
+       "type": "number"
+      },
+      {
+       "key": "allowances",
+       "label": "إجمالي العلاوات",
+       "type": "number"
+      },
+      {
+       "key": "net",
+       "label": "الصافي",
+       "type": "number"
+      },
+      {
+       "key": "phone",
+       "label": "رقم الهاتف",
+       "type": "text"
+      },
+      {
+       "key": "address",
+       "label": "العنوان",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "employee_no",
+      "name"
+     ]
+    },
+    {
+     "key": "HR_Overtime_Bonuses",
+     "label": "العمل الإضافي والمكافآت",
+     "fields": [
+      {
+       "key": "employee_no",
+       "label": "رقم الموظف",
+       "type": "text"
+      },
+      {
+       "key": "name",
+       "label": "اسم الموظف",
+       "type": "text"
+      },
+      {
+       "key": "department",
+       "label": "القسم",
+       "type": "text"
+      },
+      {
+       "key": "project",
+       "label": "المشروع",
+       "type": "text"
+      },
+      {
+       "key": "period",
+       "label": "الفترة (شهر/سنة)",
+       "type": "text"
+      },
+      {
+       "key": "hours",
+       "label": "ساعات العمل الإضافي",
+       "type": "number"
+      },
+      {
+       "key": "approved_hours",
+       "label": "الساعات المعتمدة مسبقاً",
+       "type": "number"
+      },
+      {
+       "key": "biometric_hours",
+       "label": "ساعات الإضافي المثبتة بالبصمة",
+       "type": "number"
+      },
+      {
+       "key": "overtime_pay",
+       "label": "قيمة الإضافي المصروفة",
+       "type": "number"
+      },
+      {
+       "key": "report",
+       "label": "تقرير الإنجاز",
+       "type": "text"
+      },
+      {
+       "key": "bonus",
+       "label": "قيمة المكافأة المصروفة",
+       "type": "number"
+      }
+     ],
+     "required": [
+      "employee_no",
+      "name",
+      "period"
+     ]
+    },
+    {
+     "key": "HR_Leaves_Records",
+     "label": "سجلات الإجازات",
+     "fields": [
+      {
+       "key": "employee_no",
+       "label": "رقم الموظف",
+       "type": "text"
+      },
+      {
+       "key": "name",
+       "label": "اسم الموظف",
+       "type": "text"
+      },
+      {
+       "key": "type",
+       "label": "نوع الإجازة",
+       "type": "text"
+      },
+      {
+       "key": "start",
+       "label": "تاريخ البداية",
+       "type": "date"
+      },
+      {
+       "key": "end",
+       "label": "تاريخ النهاية",
+       "type": "date"
+      },
+      {
+       "key": "balance",
+       "label": "رصيد الإجازات المتبقي",
+       "type": "number"
+      }
+     ],
+     "required": [
+      "employee_no",
+      "name",
+      "start",
+      "end"
+     ]
+    },
+    {
+     "key": "HR_Daily_Wagers",
+     "label": "عمال المياومة والعقود المؤقتة",
+     "fields": [
+      {
+       "key": "id_no",
+       "label": "الرقم التعريفي",
+       "type": "text"
+      },
+      {
+       "key": "name",
+       "label": "اسم العامل",
+       "type": "text"
+      },
+      {
+       "key": "project",
+       "label": "المشروع / القسم",
+       "type": "text"
+      },
+      {
+       "key": "period",
+       "label": "الفترة (شهر/سنة)",
+       "type": "text"
+      },
+      {
+       "key": "days",
+       "label": "أيام العمل الفعلية",
+       "type": "number"
+      },
+      {
+       "key": "daily_wage",
+       "label": "الأجر اليومي",
+       "type": "number"
+      },
+      {
+       "key": "total",
+       "label": "إجمالي المستحق",
+       "type": "number"
+      },
+      {
+       "key": "completion_report",
+       "label": "تقرير الإنجاز / شهادة الإنجاز",
+       "type": "text"
+      },
+      {
+       "key": "phone",
+       "label": "رقم الهاتف",
+       "type": "text"
+      },
+      {
+       "key": "address",
+       "label": "العنوان",
+       "type": "text"
+      },
+      {
+       "key": "bank_account",
+       "label": "رقم الحساب البنكي / IBAN",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "name",
+      "period"
+     ]
+    },
+    {
+     "key": "HR_Promotions_Increments",
+     "label": "الترقيات والعلاوات",
+     "fields": [
+      {
+       "key": "employee_no",
+       "label": "رقم الموظف",
+       "type": "text"
+      },
+      {
+       "key": "name",
+       "label": "اسم الموظف",
+       "type": "text"
+      },
+      {
+       "key": "old_grade",
+       "label": "الدرجة السابقة",
+       "type": "text"
+      },
+      {
+       "key": "new_grade",
+       "label": "الدرجة الجديدة",
+       "type": "text"
+      },
+      {
+       "key": "due_date",
+       "label": "تاريخ الاستحقاق",
+       "type": "date"
+      },
+      {
+       "key": "decision_no",
+       "label": "رقم قرار الترقية",
+       "type": "text"
+      },
+      {
+       "key": "increment_amount",
+       "label": "قيمة العلاوة",
+       "type": "number"
+      }
+     ],
+     "required": [
+      "employee_no",
+      "name"
+     ]
+    },
+    {
+     "key": "HR_Retirees_Settlements",
+     "label": "المتقاعدون والتسويات",
+     "fields": [
+      {
+       "key": "retiree_no",
+       "label": "رقم الموظف / التقاعدي",
+       "type": "text"
+      },
+      {
+       "key": "name",
+       "label": "اسم المتقاعد",
+       "type": "text"
+      },
+      {
+       "key": "retire_date",
+       "label": "تاريخ الإحالة للتقاعد",
+       "type": "date"
+      },
+      {
+       "key": "reason",
+       "label": "سبب التقاعد",
+       "type": "text"
+      },
+      {
+       "key": "gratuity",
+       "label": "مكافأة نهاية الخدمة / بدل الإجازات",
+       "type": "number"
+      },
+      {
+       "key": "clearance_no",
+       "label": "رقم براءة الذمة",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "retiree_no",
+      "name"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "fleet",
+   "label": "أنشطة وعمليات الحركة والمحروقات والصيانة",
+   "datasets": [
+    {
+     "key": "Fleet_Movement_Orders",
+     "label": "أوامر الحركة",
+     "fields": [
+      {
+       "key": "order_no",
+       "label": "رقم أمر الحركة",
+       "type": "text"
+      },
+      {
+       "key": "date",
+       "label": "تاريخ الخروج",
+       "type": "date"
+      },
+      {
+       "key": "driver",
+       "label": "اسم السائق",
+       "type": "text"
+      },
+      {
+       "key": "vehicle",
+       "label": "رقم الآلية",
+       "type": "text"
+      },
+      {
+       "key": "route",
+       "label": "خط سير الرحلة",
+       "type": "text"
+      },
+      {
+       "key": "purpose",
+       "label": "الغرض الرسمي",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "order_no",
+      "date",
+      "vehicle"
+     ]
+    },
+    {
+     "key": "Fleet_GPS_Tracking_Logs",
+     "label": "نظام التتبع الذكي",
+     "fields": [
+      {
+       "key": "vehicle",
+       "label": "رقم الآلية",
+       "type": "text"
+      },
+      {
+       "key": "datetime",
+       "label": "تاريخ ووقت الحركة",
+       "type": "text"
+      },
+      {
+       "key": "actual_route",
+       "label": "مسار الرحلة الفعلي (GPS)",
+       "type": "text"
+      },
+      {
+       "key": "off_hours",
+       "label": "تشغيل خارج الدوام / العطل",
+       "type": "text"
+      },
+      {
+       "key": "geofence",
+       "label": "تجاوز النطاق الجغرافي",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "vehicle",
+      "datetime"
+     ]
+    },
+    {
+     "key": "Fleet_Fuel_System_Logs",
+     "label": "نظام المحروقات الآلي",
+     "fields": [
+      {
+       "key": "vehicle",
+       "label": "رقم الآلية",
+       "type": "text"
+      },
+      {
+       "key": "liters",
+       "label": "كمية المحروقات (نظام المحروقات)",
+       "type": "number"
+      },
+      {
+       "key": "odometer",
+       "label": "قراءة العداد عند التعبئة",
+       "type": "number"
+      },
+      {
+       "key": "rate",
+       "label": "معدل الاستهلاك المحسوب",
+       "type": "number"
+      },
+      {
+       "key": "order_match",
+       "label": "مطابقة أمر الحركة",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "vehicle",
+      "liters"
+     ]
+    },
+    {
+     "key": "Fleet_Station_Fuel_Statements",
+     "label": "كشوفات البطاقة الذكية",
+     "fields": [
+      {
+       "key": "vehicle",
+       "label": "رقم الآلية",
+       "type": "text"
+      },
+      {
+       "key": "card_no",
+       "label": "رقم البطاقة الذكية",
+       "type": "text"
+      },
+      {
+       "key": "datetime",
+       "label": "تاريخ ووقت التعبئة",
+       "type": "text"
+      },
+      {
+       "key": "liters",
+       "label": "الكمية المؤكدة (كشف المحطة)",
+       "type": "number"
+      },
+      {
+       "key": "unit_price",
+       "label": "سعر اللتر (فاتورة المحطة)",
+       "type": "number"
+      },
+      {
+       "key": "amount",
+       "label": "القيمة المالية للفاتورة",
+       "type": "number"
+      },
+      {
+       "key": "contract_price",
+       "label": "سعر اللتر حسب العقد",
+       "type": "number"
+      },
+      {
+       "key": "invoice_no",
+       "label": "رقم الفاتورة",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "vehicle",
+      "datetime",
+      "liters"
+     ]
+    },
+    {
+     "key": "Fleet_Maintenance",
+     "label": "الصيانة وقطع الغيار",
+     "fields": [
+      {
+       "key": "vehicle",
+       "label": "رقم الآلية",
+       "type": "text"
+      },
+      {
+       "key": "date",
+       "label": "تاريخ الصيانة",
+       "type": "date"
+      },
+      {
+       "key": "description",
+       "label": "وصف الإصلاح",
+       "type": "text"
+      },
+      {
+       "key": "parts_cost",
+       "label": "تكلفة قطع الغيار",
+       "type": "number"
+      },
+      {
+       "key": "workshop",
+       "label": "ورشة الإصلاح",
+       "type": "text"
+      },
+      {
+       "key": "invoice_no",
+       "label": "رقم الفاتورة",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "vehicle",
+      "date"
+     ]
+    },
+    {
+     "key": "Fleet_Licensing_Insurance",
+     "label": "الترخيص والتأمين",
+     "fields": [
+      {
+       "key": "plate",
+       "label": "رقم الآلية / اللوحة",
+       "type": "text"
+      },
+      {
+       "key": "model",
+       "label": "نوع الآلية والموديل",
+       "type": "text"
+      },
+      {
+       "key": "prev_expiry",
+       "label": "تاريخ انتهاء الرخصة السابقة",
+       "type": "date"
+      },
+      {
+       "key": "new_license",
+       "label": "تاريخ الترخيص الجديد ورقم الإيصال",
+       "type": "text"
+      },
+      {
+       "key": "fees",
+       "label": "تكلفة الرسوم والتأمين",
+       "type": "number"
+      },
+      {
+       "key": "insurance_status",
+       "label": "حالة التأمين",
+       "type": "text"
+      },
+      {
+       "key": "insurance_expiry",
+       "label": "تاريخ انتهاء بوليصة التأمين",
+       "type": "date"
+      }
+     ],
+     "required": [
+      "plate"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "warehouses",
+   "label": "أنشطة وعمليات المستودعات والعهد",
+   "datasets": [
+    {
+     "key": "Warehouse_Master_List",
+     "label": "كشف محتويات المستودع الشامل",
+     "fields": [
+      {
+       "key": "item_no",
+       "label": "رقم الصنف",
+       "type": "text"
+      },
+      {
+       "key": "description",
+       "label": "وصف الصنف التفصيلي",
+       "type": "text"
+      },
+      {
+       "key": "category",
+       "label": "تصنيف الصنف",
+       "type": "text"
+      },
+      {
+       "key": "unit",
+       "label": "وحدة القياس",
+       "type": "text"
+      },
+      {
+       "key": "reorder",
+       "label": "حد التطلب (الحد الأدنى)",
+       "type": "number"
+      },
+      {
+       "key": "cost",
+       "label": "التكلفة التقديرية",
+       "type": "number"
+      },
+      {
+       "key": "location",
+       "label": "موقع التخزين",
+       "type": "text"
+      },
+      {
+       "key": "notes",
+       "label": "ملاحظات",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "item_no"
+     ]
+    },
+    {
+     "key": "Warehouses_Inbound_Vouchers",
+     "label": "سندات الإدخال",
+     "fields": [
+      {
+       "key": "voucher_no",
+       "label": "رقم سند الإدخال",
+       "type": "text"
+      },
+      {
+       "key": "date",
+       "label": "التاريخ",
+       "type": "date"
+      },
+      {
+       "key": "supplier",
+       "label": "اسم المورد",
+       "type": "text"
+      },
+      {
+       "key": "po_no",
+       "label": "رقم أمر الشراء",
+       "type": "text"
+      },
+      {
+       "key": "item_no",
+       "label": "رقم الصنف",
+       "type": "text"
+      },
+      {
+       "key": "qty",
+       "label": "الكمية الواردة",
+       "type": "number"
+      },
+      {
+       "key": "total",
+       "label": "القيمة الإجمالية",
+       "type": "number"
+      },
+      {
+       "key": "received_by",
+       "label": "أمين المستودع المستلم",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "voucher_no",
+      "date",
+      "item_no"
+     ]
+    },
+    {
+     "key": "Warehouses_Outbound_Vouchers",
+     "label": "سندات الإخراج",
+     "fields": [
+      {
+       "key": "voucher_no",
+       "label": "رقم سند الإخراج",
+       "type": "text"
+      },
+      {
+       "key": "date",
+       "label": "التاريخ",
+       "type": "date"
+      },
+      {
+       "key": "department",
+       "label": "القسم المستفيد",
+       "type": "text"
+      },
+      {
+       "key": "receiver",
+       "label": "اسم المستلم",
+       "type": "text"
+      },
+      {
+       "key": "item_no",
+       "label": "رقم الصنف",
+       "type": "text"
+      },
+      {
+       "key": "qty",
+       "label": "الكمية المصروفة",
+       "type": "number"
+      },
+      {
+       "key": "purpose",
+       "label": "الغرض",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "voucher_no",
+      "date",
+      "item_no"
+     ]
+    },
+    {
+     "key": "Warehouses_Physical_Stocktaking",
+     "label": "نتائج الجرد الفعلي",
+     "fields": [
+      {
+       "key": "item_no",
+       "label": "رقم الصنف",
+       "type": "text"
+      },
+      {
+       "key": "name",
+       "label": "اسم المادة",
+       "type": "text"
+      },
+      {
+       "key": "unit",
+       "label": "وحدة القياس",
+       "type": "text"
+      },
+      {
+       "key": "book",
+       "label": "الرصيد الدفتري",
+       "type": "number"
+      },
+      {
+       "key": "physical",
+       "label": "الرصيد الفعلي (الجرد)",
+       "type": "number"
+      },
+      {
+       "key": "variance_value",
+       "label": "قيمة الفروقات (عجز/زيادة)",
+       "type": "number"
+      },
+      {
+       "key": "reasons",
+       "label": "أسباب الفروقات",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "item_no"
+     ]
+    },
+    {
+     "key": "Warehouses_Obsolete",
+     "label": "المواد الراكدة والتالفة",
+     "fields": [
+      {
+       "key": "item_no",
+       "label": "رقم الصنف",
+       "type": "text"
+      },
+      {
+       "key": "name",
+       "label": "اسم المادة",
+       "type": "text"
+      },
+      {
+       "key": "in_date",
+       "label": "تاريخ الإدخال",
+       "type": "date"
+      },
+      {
+       "key": "qty",
+       "label": "الكمية الراكدة/التالفة",
+       "type": "number"
+      },
+      {
+       "key": "book_value",
+       "label": "القيمة الدفترية",
+       "type": "number"
+      },
+      {
+       "key": "reasons",
+       "label": "أسباب الركود والتلف",
+       "type": "text"
+      },
+      {
+       "key": "writeoff",
+       "label": "قرار الشطب",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "item_no"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "advances",
+   "label": "أنشطة وعمليات السلف المالية",
+   "datasets": [
+    {
+     "key": "Advances_Temporary",
+     "label": "السلف المؤقتة",
+     "fields": [
+      {
+       "key": "advance_no",
+       "label": "رقم السلفة / السند",
+       "type": "text"
+      },
+      {
+       "key": "employee",
+       "label": "اسم الموظف المستفيد",
+       "type": "text"
+      },
+      {
+       "key": "department",
+       "label": "القسم",
+       "type": "text"
+      },
+      {
+       "key": "purpose",
+       "label": "الغرض من السلفة",
+       "type": "text"
+      },
+      {
+       "key": "amount",
+       "label": "المبلغ المصروف",
+       "type": "number"
+      },
+      {
+       "key": "paid_date",
+       "label": "تاريخ الصرف",
+       "type": "date"
+      },
+      {
+       "key": "due_date",
+       "label": "تاريخ الاستحقاق القانوني",
+       "type": "date"
+      }
+     ],
+     "required": [
+      "advance_no",
+      "employee",
+      "amount"
+     ]
+    },
+    {
+     "key": "Advances_Settlements",
+     "label": "تسويات السلف",
+     "fields": [
+      {
+       "key": "advance_no",
+       "label": "رقم السلفة الأصلية",
+       "type": "text"
+      },
+      {
+       "key": "date",
+       "label": "تاريخ تقديم التسوية",
+       "type": "date"
+      },
+      {
+       "key": "invoices",
+       "label": "قيمة الفواتير والمستندات",
+       "type": "number"
+      },
+      {
+       "key": "refund",
+       "label": "قيمة الفائض المرتجع",
+       "type": "number"
+      },
+      {
+       "key": "receipt_no",
+       "label": "رقم سند القبض للفائض",
+       "type": "text"
+      },
+      {
+       "key": "remaining",
+       "label": "رصيد السلفة المتبقي",
+       "type": "number"
+      }
+     ],
+     "required": [
+      "advance_no"
+     ]
+    },
+    {
+     "key": "Advances_Permanent_Petty",
+     "label": "السلف المستديمة",
+     "fields": [
+      {
+       "key": "advance_no",
+       "label": "رقم السلفة المستديمة",
+       "type": "text"
+      },
+      {
+       "key": "custodian",
+       "label": "أمين الصندوق المسؤول",
+       "type": "text"
+      },
+      {
+       "key": "approved",
+       "label": "القيمة المعتمدة",
+       "type": "number"
+      },
+      {
+       "key": "spent",
+       "label": "إجمالي المصروف خلال الشهر",
+       "type": "number"
+      },
+      {
+       "key": "cash",
+       "label": "رصيد النقدية",
+       "type": "number"
+      },
+      {
+       "key": "replenish_date",
+       "label": "تاريخ طلب الاستعاضة",
+       "type": "date"
+      }
+     ],
+     "required": [
+      "advance_no",
+      "custodian"
+     ]
+    },
+    {
+     "key": "Advances_Overdue_Outstanding",
+     "label": "الذمم المتأخرة",
+     "fields": [
+      {
+       "key": "advance_no",
+       "label": "رقم السلفة",
+       "type": "text"
+      },
+      {
+       "key": "beneficiary",
+       "label": "اسم المستفيد",
+       "type": "text"
+      },
+      {
+       "key": "amount",
+       "label": "المبلغ المتأخر",
+       "type": "number"
+      },
+      {
+       "key": "days",
+       "label": "عدد أيام التأخير",
+       "type": "number"
+      },
+      {
+       "key": "actions",
+       "label": "الإجراءات القانونية والإدارية المتخذة",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "advance_no",
+      "beneficiary"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "procurement",
+   "label": "أنشطة وعمليات المشتريات وأوامر الشراء",
+   "datasets": [
+    {
+     "key": "Direct_Purchases_Orders",
+     "label": "أوامر الشراء والمشتريات المباشرة",
+     "fields": [
+      {
+       "key": "po_no",
+       "label": "رقم أمر الشراء",
+       "type": "text"
+      },
+      {
+       "key": "date",
+       "label": "التاريخ",
+       "type": "date"
+      },
+      {
+       "key": "supplier",
+       "label": "اسم المورد",
+       "type": "text"
+      },
+      {
+       "key": "nature",
+       "label": "طبيعة المشتريات / المواد",
+       "type": "text"
+      },
+      {
+       "key": "value",
+       "label": "القيمة",
+       "type": "number"
+      },
+      {
+       "key": "method",
+       "label": "طريقة الشراء",
+       "type": "text"
+      },
+      {
+       "key": "approver",
+       "label": "صاحب الصلاحية الموافق",
+       "type": "text"
+      },
+      {
+       "key": "entered_by",
+       "label": "مُدخل أمر الشراء",
+       "type": "text"
+      },
+      {
+       "key": "received_by",
+       "label": "مستلم المواد",
+       "type": "text"
+      },
+      {
+       "key": "supplier_phone",
+       "label": "هاتف المورد",
+       "type": "text"
+      },
+      {
+       "key": "supplier_address",
+       "label": "عنوان المورد",
+       "type": "text"
+      },
+      {
+       "key": "supplier_bank",
+       "label": "الحساب البنكي للمورد",
+       "type": "text"
+      },
+      {
+       "key": "supplier_national_id",
+       "label": "الرقم الوطني للمورد (إن كان فرداً)",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "po_no",
+      "date",
+      "supplier",
+      "value"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "tenders",
+   "label": "أنشطة وعمليات العطاءات",
+   "datasets": [
+    {
+     "key": "Tenders_Records",
+     "label": "سجلات العطاءات والمشتريات الكبرى",
+     "fields": [
+      {
+       "key": "tender_no",
+       "label": "رقم العطاء",
+       "type": "text"
+      },
+      {
+       "key": "date",
+       "label": "تاريخ الطرح",
+       "type": "date"
+      },
+      {
+       "key": "subject",
+       "label": "موضوع العطاء",
+       "type": "text"
+      },
+      {
+       "key": "estimated_value",
+       "label": "القيمة التقديرية",
+       "type": "number"
+      },
+      {
+       "key": "awarded_value",
+       "label": "قيمة الإحالة",
+       "type": "number"
+      },
+      {
+       "key": "winner",
+       "label": "الجهة المحال عليها",
+       "type": "text"
+      },
+      {
+       "key": "bidders",
+       "label": "عدد المتقدمين",
+       "type": "number"
+      },
+      {
+       "key": "committee",
+       "label": "لجنة العطاءات",
+       "type": "text"
+      },
+      {
+       "key": "status",
+       "label": "الحالة",
+       "type": "text"
+      },
+      {
+       "key": "winner_phone",
+       "label": "هاتف الجهة المحال عليها",
+       "type": "text"
+      },
+      {
+       "key": "winner_address",
+       "label": "عنوان الجهة المحال عليها",
+       "type": "text"
+      },
+      {
+       "key": "winner_bank",
+       "label": "الحساب البنكي للجهة المحال عليها",
+       "type": "text"
+      },
+      {
+       "key": "winner_national_id",
+       "label": "الرقم الوطني للجهة المحال عليها (إن كانت فرداً)",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "tender_no",
+      "date"
+     ]
+    },
+    {
+     "key": "Engineering_BoQ_Master",
+     "label": "جداول الكميات والأسعار (BoQ)",
+     "fields": [
+      {
+       "key": "project_no",
+       "label": "رقم المشروع",
+       "type": "text"
+      },
+      {
+       "key": "project_name",
+       "label": "اسم المشروع",
+       "type": "text"
+      },
+      {
+       "key": "item_no",
+       "label": "رقم البند",
+       "type": "text"
+      },
+      {
+       "key": "description",
+       "label": "وصف البند",
+       "type": "text"
+      },
+      {
+       "key": "unit",
+       "label": "الوحدة",
+       "type": "text"
+      },
+      {
+       "key": "quantity",
+       "label": "الكمية الأصلية",
+       "type": "number"
+      },
+      {
+       "key": "unit_price",
+       "label": "سعر الوحدة",
+       "type": "number"
+      },
+      {
+       "key": "total",
+       "label": "إجمالي البند",
+       "type": "number"
+      },
+      {
+       "key": "contract_value",
+       "label": "قيمة العقد",
+       "type": "number"
+      }
+     ],
+     "required": [
+      "project_no",
+      "item_no"
+     ]
+    },
+    {
+     "key": "Engineering_Site_Handover_Minutes",
+     "label": "محاضر تسليم الموقع",
+     "fields": [
+      {
+       "key": "project_no",
+       "label": "رقم المشروع",
+       "type": "text"
+      },
+      {
+       "key": "contractor",
+       "label": "المقاول",
+       "type": "text"
+      },
+      {
+       "key": "handover_date",
+       "label": "تاريخ تسليم الموقع",
+       "type": "date"
+      },
+      {
+       "key": "commencement_date",
+       "label": "تاريخ المباشرة العقدية",
+       "type": "date"
+      },
+      {
+       "key": "contract_days",
+       "label": "مدة العقد (يوم)",
+       "type": "number"
+      },
+      {
+       "key": "minutes_no",
+       "label": "رقم المحضر",
+       "type": "text"
+      },
+      {
+       "key": "signed_by",
+       "label": "الموقعون على المحضر",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "project_no",
+      "contractor"
+     ]
+    },
+    {
+     "key": "Engineering_Progress_Payments",
+     "label": "المستخلصات الهندسية",
+     "fields": [
+      {
+       "key": "project_no",
+       "label": "رقم المشروع",
+       "type": "text"
+      },
+      {
+       "key": "payment_no",
+       "label": "رقم المستخلص",
+       "type": "text"
+      },
+      {
+       "key": "date",
+       "label": "تاريخ المستخلص",
+       "type": "date"
+      },
+      {
+       "key": "type",
+       "label": "نوع المستخلص (مرحلي / نهائي)",
+       "type": "text"
+      },
+      {
+       "key": "item_no",
+       "label": "رقم بند الكميات",
+       "type": "text"
+      },
+      {
+       "key": "executed_qty",
+       "label": "الكمية المنفذة",
+       "type": "number"
+      },
+      {
+       "key": "paid_amount",
+       "label": "المبلغ المصروف",
+       "type": "number"
+      },
+      {
+       "key": "cumulative_paid",
+       "label": "المصروف التراكمي",
+       "type": "number"
+      },
+      {
+       "key": "progress_pct",
+       "label": "نسبة الإنجاز الفعلي %",
+       "type": "number"
+      },
+      {
+       "key": "delay_penalty",
+       "label": "غرامة التأخير المحتسبة",
+       "type": "number"
+      },
+      {
+       "key": "engineer",
+       "label": "المهندس المشرف",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "project_no",
+      "payment_no"
+     ]
+    },
+    {
+     "key": "Engineering_Time_Extensions_Variations",
+     "label": "تمديدات المدة وأوامر التغيير",
+     "fields": [
+      {
+       "key": "project_no",
+       "label": "رقم المشروع",
+       "type": "text"
+      },
+      {
+       "key": "request_no",
+       "label": "رقم الطلب / أمر التغيير",
+       "type": "text"
+      },
+      {
+       "key": "type",
+       "label": "النوع (تمديد مدة / أمر تغيير)",
+       "type": "text"
+      },
+      {
+       "key": "date",
+       "label": "التاريخ",
+       "type": "date"
+      },
+      {
+       "key": "extension_days",
+       "label": "أيام التمديد",
+       "type": "number"
+      },
+      {
+       "key": "variation_value",
+       "label": "قيمة أمر التغيير",
+       "type": "number"
+      },
+      {
+       "key": "approved",
+       "label": "معتمد (نعم / لا)",
+       "type": "text"
+      },
+      {
+       "key": "approved_by",
+       "label": "جهة الاعتماد",
+       "type": "text"
+      },
+      {
+       "key": "reason",
+       "label": "السبب",
+       "type": "text"
+      }
+     ],
+     "required": [
+      "project_no",
+      "request_no"
+     ]
+    }
+   ]
+  }
+ ]
+}

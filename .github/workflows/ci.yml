@@ -1,0 +1,68 @@
+# التكامل المستمر: لا تُعتمد نسخة قبل أن تنجح الاختبارات والبناء.
+# يعمل على كل push وعلى كل طلب دمج.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Tests and build (Node)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # اختبار التكافؤ (src/test/engine-parity.test.ts) يشغّل محرك Python أيضاً، فيلزم python وpandas هنا.
+      # إن غابا يُتخطى الاختبار بصمت، لذلك نتحقق صراحة أنهما موجودان.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: python/requirements.txt
+      - run: pip install pandas openpyxl
+      - name: Python engine is available for the parity test
+        run: python -c "import pandas; print('pandas', pandas.__version__)"
+
+      - run: npm ci
+
+      # غير حاجب مؤقتاً: لم يُشغَّل lint على هذا المشروع من قبل ولا نعرف عدد مخالفاته.
+      # أصلح المخالفات ثم احذف continue-on-error ليصبح حاجباً.
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Unit and UI tests
+        run: npm test
+
+      - name: Production build
+        run: npx vite build
+        env:
+          NITRO_PRESET: node-server
+
+  python:
+    name: Python engine tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: python/requirements.txt
+      - run: pip install pandas openpyxl pytest
+      - run: python -m pytest python -q

@@ -1,0 +1,6 @@
+requests
+beautifulsoup4
+pdfplumber
+# اختياري لـ OCR (RASD_OCR=1):
+# pdf2image
+# pytesseract

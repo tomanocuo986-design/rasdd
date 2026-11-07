@@ -1,0 +1,234 @@
+{
+  "_about": "تصنيف ملاحظات تقريري ديوان المحاسبة المدمجين: هل يمكن كشفها آلياً من جداول البرنامج؟ التصنيف اجتهاد أولي يراجعه المدقق. انظر docs/COVERAGE.ar.md.",
+  "categories": {
+    "covered_partially": "يغطيها اختبار قائم جزئياً",
+    "data_exists_no_test": "البيانات موجودة في الجداول ولا يوجد اختبار",
+    "needs_new_fields": "تحتاج حقولاً غير موجودة في نموذج البيانات",
+    "document_review": "إجرائية تُكشف بمراجعة المستندات لا الجداول"
+  },
+  "items": [
+    {
+      "report": "seed-audit-bureau-quwaira-tenders-2026",
+      "n": 1,
+      "title": "القيام بالشراء بأسلوب الاستدراج دون مراعاة الحالات التي يجوز",
+      "category": "needs_new_fields",
+      "missing": [
+        [
+          "Tenders_Records",
+          "procurement_method"
+        ],
+        [
+          "Tenders_Records",
+          "method_justification"
+        ]
+      ],
+      "note": "أسلوب الطرح (استدراج/مناقصة عامة) ومبرره غير موجودين في جدول العطاءات."
+    },
+    {
+      "report": "seed-audit-bureau-quwaira-tenders-2026",
+      "n": 2,
+      "title": "دعوة عدد محدود من المناقصين غير المصنفين للتقدم للعطاءات",
+      "category": "needs_new_fields",
+      "missing": [
+        [
+          "Tenders_Records",
+          "invitees_classified"
+        ]
+      ],
+      "note": "تصنيف المناقصين المدعوين غير مسجل."
+    },
+    {
+      "report": "seed-audit-bureau-quwaira-tenders-2026",
+      "n": 3,
+      "title": "القيام بالشراء بأسلوب الشراء المباشر (التلزيم) دون مراعاة ال",
+      "category": "needs_new_fields",
+      "note": "حقل «طريقة الشراء» نص حر دون مبرر موثق ولا حالات مسموحة معرّفة؛ يلزم حقل مبرر قبل أي اختبار.",
+      "missing": [
+        [
+          "Direct_Purchases_Orders",
+          "method_justification"
+        ]
+      ]
+    },
+    {
+      "report": "seed-audit-bureau-quwaira-tenders-2026",
+      "n": 4,
+      "title": "عدم تحديد مكان وطريقة تقديم العروض وآخر موعد لتقديمها وموعد ",
+      "category": "document_review",
+      "note": "محتوى إعلان دعوة العطاء مستند نصي لا جدول.",
+      "reviewItem": "ad_details"
+    },
+    {
+      "report": "seed-audit-bureau-quwaira-tenders-2026",
+      "n": 5,
+      "title": "التعاقد مع جهات خارجية لتقديم خدمات فنية بالرغم من توفر الكو",
+      "category": "document_review",
+      "note": "حكم على توفر الكوادر الفنية يحتاج قراءة قرارات التكليف والعقود.",
+      "needsCrossDocument": true
+    },
+    {
+      "report": "seed-audit-bureau-quwaira-tenders-2026",
+      "n": 6,
+      "title": "عدم إصدار أمر تغييري بإلغاء البند رقم (2) والخاص بالإشراف ال",
+      "category": "needs_new_fields",
+      "missing": [
+        [
+          "Engineering_Time_Extensions_Variations",
+          "item_no"
+        ]
+      ],
+      "note": "لا يُسجَّل بند جدول الكميات الملغى في أوامر التغيير، فلا يمكن ربطه بالبند."
+    },
+    {
+      "report": "seed-audit-bureau-quwaira-tenders-2026",
+      "n": 7,
+      "title": "طرح عطاء دون وجود شروط عامة وخاصة ومواصفات فنية تنظم العملية",
+      "category": "document_review",
+      "note": "وجود الشروط والمواصفات في وثائق العطاء.",
+      "reviewItem": "tender_conditions"
+    },
+    {
+      "report": "seed-audit-bureau-quwaira-tenders-2026",
+      "n": 8,
+      "title": "عدم تقديم الاستشاري كفالة حسن التنفيذ وتوقيع عقد الخدمات اله",
+      "category": "needs_new_fields",
+      "missing": [
+        [
+          "Tenders_Records",
+          "performance_bond_date"
+        ],
+        [
+          "Tenders_Records",
+          "contract_signed_date"
+        ]
+      ],
+      "note": "كفالة حسن التنفيذ وتاريخ توقيع العقد غير مسجلين."
+    },
+    {
+      "report": "seed-audit-bureau-quwaira-tenders-2026",
+      "n": 9,
+      "title": "عدم وجود خطة شرائية للمشاريع التي تقل قيمتها عن 20,000 دينار",
+      "category": "document_review",
+      "note": "وجود الخطة الشرائية مستند.",
+      "reviewItem": "procurement_plan"
+    },
+    {
+      "report": "seed-audit-bureau-quwaira-tenders-2026",
+      "n": 10,
+      "title": "عدم وجود موافقة أصولية من البلدية وقسم الدراسات (عمان) على ا",
+      "category": "covered_partially",
+      "tests": [
+        "محضر تسليم دون توقيعات"
+      ],
+      "note": "اختبار محضر التسليم غير الموقع يغطي جانب المحضر فقط، لا الموافقة الأصولية على المخططات."
+    },
+    {
+      "report": "seed-audit-bureau-quwaira-tenders-2026",
+      "n": 11,
+      "title": "عدم وجود مستندات التزام مالي تخص العطاءات التي تقل عن 20,000",
+      "category": "document_review",
+      "note": "مستندات الالتزام المالي مستندات.",
+      "reviewItem": "financial_commitment"
+    },
+    {
+      "report": "seed-audit-bureau-quwaira-tenders-2026",
+      "n": 12,
+      "title": "عدم إبراز مصادقة الوزير على إحالة العطاء الخاص بشراء خدمات م",
+      "category": "needs_new_fields",
+      "missing": [
+        [
+          "Tenders_Records",
+          "minister_approval"
+        ]
+      ],
+      "note": "مصادقة الوزير على الإحالة غير مسجلة."
+    },
+    {
+      "report": "seed-audit-bureau-quwaira-tenders-2026",
+      "n": 13,
+      "title": "عدم إبراز ما يفيد بوجود هيكل تنظيمي للبلدية",
+      "category": "document_review",
+      "note": "الهيكل التنظيمي مستند.",
+      "reviewItem": "org_structure"
+    },
+    {
+      "report": "seed-audit-bureau-quwaira-tenders-2026",
+      "n": 14,
+      "title": "عدم الالتزام بإعداد طلبات شراء للعطاءات تتضمن كافة المعلومات",
+      "category": "document_review",
+      "note": "اكتمال طلب الشراء يحتاج مراجعة النموذج.",
+      "reviewItem": "purchase_request_complete"
+    },
+    {
+      "report": "seed-audit-bureau-quwaira-tenders-2026",
+      "n": 15,
+      "title": "عدم قيام البلدية باعتماد كادر الإشراف في بعض العطاءات بالإضا",
+      "category": "document_review",
+      "note": "اعتماد كادر الإشراف وإثبات دوامه من مستندات.",
+      "reviewItem": "supervision_staff"
+    },
+    {
+      "report": "seed-audit-bureau-rahma-wasti-2024-7",
+      "n": 1,
+      "title": "اعتماد كوادر المقاول (ممثل المقاول ومراقب الطرق) رغم عدم است",
+      "category": "document_review",
+      "note": "مطابقة مؤهلات الكوادر بالمتطلبات التعاقدية تحتاج سير ذاتية وشروط العقد.",
+      "reviewItem": "contractor_staff_qualifications"
+    },
+    {
+      "report": "seed-audit-bureau-rahma-wasti-2024-7",
+      "n": 2,
+      "title": "قصور في المبررات القانونية والفنية لتمديد مدة العطاء (120 + ",
+      "category": "covered_partially",
+      "note": "اختبار التمديد دون سبب موثق والتمديدات المتراكمة (معطّل حتى يحدد المدقق النسبة) يغطيان جانب التمديد، لا كفاية المبررات القانونية والفنية ولا التنسيق مع الجهات الخدمية.",
+      "tests": [
+        "تمديد مدة دون سبب موثق",
+        "تمديدات متراكمة تتجاوز النسبة المسموحة من مدة العقد"
+      ]
+    },
+    {
+      "report": "seed-audit-bureau-rahma-wasti-2024-7",
+      "n": 3,
+      "title": "تسوية ودية مع المقاول بتعويضه بمبلغ مقطوع 10,000 دينار وإعفا",
+      "category": "covered_partially",
+      "tests": [
+        "تجاوز المدة العقدية دون غرامة تأخير"
+      ],
+      "note": "الاختبار يكشف غياب غرامة التأخير، لا التسوية الودية بمبلغ مقطوع."
+    },
+    {
+      "report": "seed-audit-bureau-rahma-wasti-2024-7",
+      "n": 4,
+      "title": "وجود بعض الشذوذ في الفحوصات المخبرية",
+      "category": "needs_new_fields",
+      "missing": [
+        [
+          "Engineering_Progress_Payments",
+          "lab_test_result"
+        ]
+      ],
+      "note": "نتائج الفحوصات المخبرية غير مسجلة في الجداول."
+    },
+    {
+      "report": "seed-audit-bureau-rahma-wasti-2024-7",
+      "n": 5,
+      "title": "طرح العطاء بالمناقصة المحدودة (استدراج) بدلًا من المناقصة ال",
+      "category": "needs_new_fields",
+      "missing": [
+        [
+          "Tenders_Records",
+          "procurement_method"
+        ]
+      ],
+      "note": "أسلوب الطرح غير مسجل في جدول العطاءات."
+    },
+    {
+      "report": "seed-audit-bureau-rahma-wasti-2024-7",
+      "n": 6,
+      "title": "ازدواجية في الإشراف على أعمال عطاء مشروع تحسين وتأهيل شارع ر",
+      "category": "document_review",
+      "note": "ازدواجية الإشراف تحتاج مقارنة عقد الإشراف بقرارات التكليف.",
+      "needsCrossDocument": true
+    }
+  ]
+}
