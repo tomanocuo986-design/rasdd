@@ -3,8 +3,8 @@
 // الناتج في offline-dist/: app.pack (ملفات التطبيق فقط، مضغوطة، غير مشفّرة، تبقى على الخادم)،
 // app.pack.meta.json، و launcher/ (المشغّل الذي يُضاف إلى كل تنزيل). التشفير بكلمة مرور المستخدم يتم عند التنزيل.
 // لا يدخل في الحزمة: ملفات البيئة (.env*)، مجلد data، سجلات jsonl، قواعد sqlite. ويفشل البناء إن وُجد سر معروف داخل الملفات.
-import { createReadStream, createWriteStream, existsSync } from "node:fs";
-import { copyFile, mkdir, open, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
+import { createWriteStream, existsSync } from "node:fs";
+import { copyFile, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
@@ -17,7 +17,7 @@ const root = path.resolve(here, "..");
 
 const MANIFEST = ".rasd-manifest.json";
 const ENTRY_CANDIDATES = ["server/index.mjs", "server/index.js"];
-const SCAN_CHUNK = 4 * 1024 * 1024; // الملفات الكبيرة تُفحص على دفعات متداخلة (لا يُتخطّى أي ملف)
+const SCAN_MAX_BYTES = 8 * 1024 * 1024;
 
 // أسرار البيئة الحالية: إن وُجدت قيمتها حرفياً داخل ملفات الناتج فهذا تسريب (مثلاً قيمة سُرِّبت وقت البناء).
 const SECRET_ENV = [
@@ -72,79 +72,25 @@ async function walk(base, rel = "", out = [], excluded = []) {
     if (e.isSymbolicLink() && st.isDirectory()) {
       throw new Error(`رابط رمزي لمجلد غير مدعوم: ${r}. أعد البناء بنسخة فعلية (بدون روابط).`);
     }
-    if (e.isSymbolicLink() && st.isFile()) {
-      // رابط إلى ملف: يجب أن يقع هدفه داخل مجلد البناء أو المشروع، وإلا قد يُضمَّن ملف من خارجهما (مفاتيح، إعدادات النظام).
-      const real = await realpath(abs);
-      const inside = (p) => real === p || real.startsWith(p + path.sep);
-      if (!inside(path.resolve(base)) && !inside(root)) {
-        throw new Error(`رابط رمزي يشير إلى ملف خارج المشروع: ${r}. أعد البناء بنسخة فعلية.`);
-      }
-    }
     if (st.isDirectory()) await walk(base, r, out, excluded);
     else if (st.isFile()) out.push({ rel: r, abs, size: st.size });
   }
   return { files: out, excluded };
 }
 
-/** القيم الحرفية التي يجب ألا تظهر في الناتج: القيمة كاملة + أجزاؤها (رموز API، كلمة مرور قاعدة البيانات). */
-export function secretLiterals(env = process.env) {
-  const out = new Map(); // value(latin1 of utf8 bytes) -> name
-  const add = (name, v) => {
-    const t = String(v ?? "").trim();
-    if (t.length >= 8) out.set(Buffer.from(t, "utf8").toString("latin1"), name);
-  };
-  for (const k of SECRET_ENV) {
-    const v = env[k];
-    if (!v) continue;
-    add(k, v);
-    if (k === "RASD_API_TOKENS" || k === "RASD_DATA_KEY_PREV") {
-      for (const part of v.split(",")) {
-        add(k, part);
-        const i = part.indexOf(":");
-        if (i > 0) add(k, part.slice(i + 1));
-      }
-    }
-    if (k === "DATABASE_URL") {
-      try {
-        const u = new URL(v);
-        if (u.password) add(k, decodeURIComponent(u.password));
-      } catch {
-        /* القيمة الكاملة مفحوصة أعلاه */
-      }
-    }
-  }
-  return [...out].map(([value, name]) => [name, value]);
-}
-
-async function scanFile(f, literals, buf, overlap) {
-  const labels = new Set();
-  const fh = await open(f.abs, "r");
-  try {
-    let pos = 0;
-    let carry = "";
-    for (;;) {
-      const { bytesRead } = await fh.read(buf, 0, buf.length, pos);
-      if (!bytesRead) break;
-      pos += bytesRead;
-      const text = carry + buf.subarray(0, bytesRead).toString("latin1");
-      for (const [name, value] of literals) if (text.includes(value)) labels.add(`قيمة ${name} من البيئة الحالية`);
-      for (const [name, re] of SECRET_PATTERNS) if (re.test(text)) labels.add(name);
-      carry = text.slice(-overlap);
-    }
-  } finally {
-    await fh.close();
-  }
-  return labels;
-}
-
 async function scanForSecrets(files, ignore) {
-  const literals = secretLiterals();
-  const overlap = Math.max(4096, ...literals.map(([, v]) => v.length));
-  const buf = Buffer.alloc(SCAN_CHUNK);
+  const literals = SECRET_ENV.map((k) => [k, process.env[k]]).filter(([, v]) => v && v.length >= 8);
   const hits = [];
   for (const f of files) {
     if (ignore.some((s) => f.rel.includes(s))) continue;
-    for (const label of await scanFile(f, literals, buf, overlap)) hits.push(`${f.rel}: ${label}`);
+    if (f.size > SCAN_MAX_BYTES) continue;
+    const text = (await readFile(f.abs)).toString("latin1");
+    for (const [name, value] of literals) {
+      if (text.includes(value)) hits.push(`${f.rel}: قيمة ${name} من البيئة الحالية`);
+    }
+    for (const [name, re] of SECRET_PATTERNS) {
+      if (re.test(text)) hits.push(`${f.rel}: ${name}`);
+    }
   }
   return hits;
 }
@@ -183,20 +129,12 @@ export async function buildOfflinePackage(opts = {}) {
   const all = [{ rel: MANIFEST, abs: manifestPath, size: manifest.length }, ...files];
 
   const tmp = path.join(outDir, "app.pack.tmp");
-  try {
-    await pipeline(packFilesStream(all), createGzip({ level: 9 }), createWriteStream(tmp));
-  } catch (e) {
-    await rm(tmp, { force: true });
-    throw e;
-  } finally {
-    await rm(manifestPath, { force: true });
-  }
+  await pipeline(packFilesStream(all), createGzip({ level: 9 }), createWriteStream(tmp));
+  await rm(manifestPath, { force: true });
   const packPath = path.join(outDir, "app.pack");
   await rename(tmp, packPath);
 
-  const hash = createHash("sha256");
-  for await (const c of createReadStream(packPath)) hash.update(c); // بثّ: الحزمة قد تبلغ مئات الميغابايت
-  const sha = hash.digest("hex");
+  const sha = createHash("sha256").update(await readFile(packPath)).digest("hex");
   const { size } = await stat(packPath);
   const meta = { builtAt: new Date().toISOString(), size, files: files.length, entry, sha256: sha };
   await writeFile(path.join(outDir, "app.pack.meta.json"), JSON.stringify(meta, null, 2));

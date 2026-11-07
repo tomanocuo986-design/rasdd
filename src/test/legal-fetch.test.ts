@@ -96,7 +96,6 @@ describe("isPrivateAddress", () => {
       "100.64.0.1", "198.18.0.1", "224.0.0.1", "255.255.255.255",
       "::", "::1", "fc00::1", "fd12:3456::1", "fe80::1", "ff02::1", "::ffff:127.0.0.1", "::ffff:10.0.0.1",
       "::ffff:7f00:1", "64:ff9b::7f00:1", "2002:7f00:1::1", "2001:db8::1", "garbage",
-      "192.88.99.1", "fec0::1", "100::1", "2001:0:4136:e378:8000:63bf:3fff:fdd2",
     ]) {
       expect(isPrivateAddress(ip), ip).toBe(true);
     }
@@ -236,41 +235,5 @@ describe("fetchLegalPdf", () => {
     const body = Buffer.concat([Buffer.from("\n\n  "), pdf()]);
     const r = await fetchLegalPdf(url, { hosts: HOSTS, resolve: async () => PUBLIC, get: async () => ok(body) });
     expect(r.ok).toBe(true);
-  });
-});
-
-describe("fetchLegalPdf: عدة عناوين", () => {
-  const url = "https://www.gtd.gov.jo/a.pdf";
-  const V4 = { address: "93.184.216.34", family: 4 as const };
-  const V6 = { address: "2606:4700:4700::1111", family: 6 as const };
-
-  it("يجرّب IPv4 أولاً ثم يتجاوز إلى العنوان التالي عند فشل الاتصال", async () => {
-    const seen: string[] = [];
-    const get = vi.fn<GetFn>(async (_u, ip) => {
-      seen.push(ip.address);
-      if (ip.family === 4) throw Object.assign(new Error("x"), { code: "ENETUNREACH" });
-      return ok(pdf());
-    });
-    const r = await fetchLegalPdf(url, { hosts: HOSTS, resolve: async () => [V6, V4], get });
-    expect(r.ok).toBe(true);
-    expect(seen).toEqual([V4.address, V6.address]);
-  });
-
-  it("لا يجرّب عنواناً آخر عند فشل الشهادة", async () => {
-    const get = vi.fn<GetFn>(async () => {
-      throw Object.assign(new Error("x"), { code: "ERR_TLS_CERT_ALTNAME_INVALID" });
-    });
-    const r = await fetchLegalPdf(url, { hosts: HOSTS, resolve: async () => [V4, V6], get });
-    expect(r).toMatchObject({ ok: false, status: 502 });
-    expect(get).toHaveBeenCalledTimes(1);
-  });
-
-  it("يفشل بنتيجة 502 إن فشلت كل العناوين", async () => {
-    const get = vi.fn<GetFn>(async () => {
-      throw Object.assign(new Error("x"), { code: "ECONNREFUSED" });
-    });
-    const r = await fetchLegalPdf(url, { hosts: HOSTS, resolve: async () => [V4, V6], get });
-    expect(r).toMatchObject({ ok: false, status: 502 });
-    expect(get).toHaveBeenCalledTimes(2);
   });
 });

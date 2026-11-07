@@ -13,4 +13,3 @@ export function buildOfflinePackage(opts?: {
   excluded: string[];
   outDir: string;
 }>;
-export function secretLiterals(env?: NodeJS.ProcessEnv): Array<[name: string, value: string]>;

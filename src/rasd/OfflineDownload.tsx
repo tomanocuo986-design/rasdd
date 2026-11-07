@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, Check, Download, FolderOpen, KeyRound, Maximize2, Minimize2, Pause, Play, Rocket, ShieldCheck, X } from "lucide-react";
 
-const MIN = 12;
+const MIN = 10;
 const VIDEO_URL = "/offline-guide.mp4"; // اختياري: ضع الفيديو في public/offline-guide.mp4 فيظهر تلقائياً
 const SLIDE_MS = 3600;
 
@@ -151,10 +151,8 @@ export function OfflineDownload() {
   }, []);
 
   // فيديو الشرح خطوة مستقلة اختيارية: تظهر فقط إن كان الملف موجوداً فعلاً (ويمكن تخطّيها).
-  const visible = !!status && status.enabled !== false && status.available !== false;
   useEffect(() => {
-    // لا نطلب الفيديو لمن لا يظهر له الزر (غير المدير، أو الميزة معطّلة، أو الحزمة غير مبنية)
-    if (!visible || typeof document === "undefined") return;
+    if (typeof document === "undefined") return;
     const v = document.createElement("video");
     v.preload = "metadata";
     v.onloadedmetadata = () => setHasVideo(true);
@@ -163,7 +161,7 @@ export function OfflineDownload() {
       v.onloadedmetadata = null;
       v.removeAttribute("src");
     };
-  }, [visible]);
+  }, []);
 
   useEffect(() => {
     if (open && stage === "password") firstField.current?.focus();

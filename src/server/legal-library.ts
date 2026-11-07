@@ -22,11 +22,6 @@ export type CatalogItem = {
   site: string;
   url: string;
   effectiveDate?: string;
-  /**
-   * بصمة النسخة التي اعتمدها المدقق (بداية sha المعروض في القائمة). إن وُضعت ثم تغيّر الملف على الموقع الرسمي
-   * لا تُستبدل النسخة المحفوظة ويظهر البند بحالة تحتاج مراجعة، فلا يدخل نص جديد إلى «السند القانوني» دون قرار بشري.
-   */
-  pinSha?: string;
 };
 
 export const DEFAULT_CATALOG: readonly CatalogItem[] = [
@@ -58,20 +53,17 @@ export const DEFAULT_CATALOG: readonly CatalogItem[] = [
     id: "hr-regulation-33-2024",
     title: "نظام إدارة الموارد البشرية في القطاع العام رقم (33) لسنة 2024 وتعديلاته",
     site: "هيئة الخدمة والإدارة العامة",
-    url: "https://www.spac.gov.jo/ebv4.0/root_storage/ar/eb_list_page/النظام_معدل-.pdf",
+    url: "https://spac.gov.jo/ebv4.0/root_storage/ar/eb_list_page/النظام_معدل-.pdf",
   },
   {
     id: "civil-service-regulation",
-    title: "نظام الخدمة المدنية رقم (9) لسنة 2020 (النص الأصلي — قد يكون ملغى أو معدلاً بنظام الموارد البشرية 33/2024: تحقق قبل الاستشهاد)",
+    title: "نظام الخدمة المدنية رقم (9) لسنة 2020 (النص الأصلي — تحقق من سريانه)",
     site: "بوابة الحكومة الأردنية (الجريدة الرسمية)",
     url: "https://portal.jordan.gov.jo/OD/files/6983.pdf",
   },
 ];
 
 const MAX_CATALOG = 30;
-/** سقف مجموع ما يُحفظ في الذاكرة من ملفات (م.ب). يمنع 30 ملفاً كبيراً من استنزاف ذاكرة الخادم. */
-export const DEFAULT_MAX_TOTAL_BYTES = 150 * 1024 * 1024;
-const PIN_RE = /^[0-9a-f]{8,32}$/;
 const ID_RE = /^[a-z0-9][a-z0-9-]{0,59}$/;
 
 export const libraryEnabled = (env: Env = process.env): boolean =>
@@ -113,17 +105,12 @@ export function loadCatalog(
             typeof o["effectiveDate"] === "string" && /^\d{4}-\d{2}-\d{2}$/.test(o["effectiveDate"])
               ? o["effectiveDate"]
               : undefined;
-          const pin =
-            typeof o["pinSha"] === "string" && PIN_RE.test(o["pinSha"].toLowerCase())
-              ? o["pinSha"].toLowerCase()
-              : undefined;
           add({
             id,
             title: o["title"].slice(0, 200),
             site: typeof o["site"] === "string" ? o["site"].slice(0, 120) : "",
             url: o["url"],
             ...(ed ? { effectiveDate: ed } : {}),
-            ...(pin ? { pinSha: pin } : {}),
           });
         }
       }
@@ -145,8 +132,6 @@ export type PublicItem = {
   bytes?: number;
   effectiveDate?: string;
   error?: string;
-  /** نسخة محفوظة وصالحة، لكن آخر جلب لم يُعتمد (تغيّر عن pinSha أو تجاوز الميزانية): تحتاج مراجعة بشرية. */
-  warning?: string;
 };
 
 type Entry = {
@@ -165,7 +150,6 @@ export type LibraryOpts = {
   fetchPdf: (url: string) => Promise<Fetched | Reject>;
   ttlMs?: number;
   retryMs?: number;
-  maxTotalBytes?: number;
   now?: () => number;
   onEvent?: (e: { action: string; detail: string }) => void;
 };
@@ -188,7 +172,6 @@ const where = (raw: string): string => {
 export function createLegalLibrary(opts: LibraryOpts) {
   const ttl = opts.ttlMs ?? 24 * 3600_000;
   const retry = opts.retryMs ?? 10 * 60_000;
-  const maxTotal = opts.maxTotalBytes ?? DEFAULT_MAX_TOTAL_BYTES;
   const now = opts.now ?? Date.now;
   const store = new Map<string, Entry>();
   let queue: Promise<void> = Promise.resolve();
@@ -200,39 +183,9 @@ export function createLegalLibrary(opts: LibraryOpts) {
     queue = queue.then(async () => {
       try {
         const r = await opts.fetchPdf(item.url);
-        if (!r.ok) {
-          e.retryAt = now() + retry;
-          e.error = r.error;
-          if (!e.body) e.state = "error"; // إن وُجدت نسخة قديمة نُبقيها بدل أن نفقدها
-          opts.onEvent?.({
-            action: "legal.library_failed",
-            detail: `${where(item.url)} status=${r.status}`,
-          });
-          return;
-        }
-        const sha = createHash("sha256").update(r.body).digest("hex").slice(0, 32);
-        let others = 0;
-        for (const v of store.values()) if (v !== e && v.body) others += v.body.length;
-        if (item.pinSha && !sha.startsWith(item.pinSha)) {
-          // الملف على الموقع الرسمي تغيّر عن النسخة المعتمدة: نُبقي القديمة (إن وُجدت) ونطلب قراراً بشرياً.
-          e.retryAt = now() + ttl;
-          e.error = "تغيّر الملف على الموقع الرسمي عن النسخة المعتمدة. راجعه ثم حدّث pinSha.";
-          if (!e.body) e.state = "error";
-          opts.onEvent?.({
-            action: "legal.library_changed",
-            detail: `${where(item.url)} sha=${sha.slice(0, 12)}`,
-          });
-        } else if (others + r.body.length > maxTotal) {
-          e.retryAt = now() + retry;
-          e.error = "تجاوز مجموع حجم المكتبة الرسمية المسموح في ذاكرة الخادم.";
-          if (!e.body) e.state = "error";
-          opts.onEvent?.({
-            action: "legal.library_failed",
-            detail: `${where(item.url)} status=memory_budget`,
-          });
-        } else {
+        if (r.ok) {
           e.body = r.body;
-          e.sha = sha;
+          e.sha = createHash("sha256").update(r.body).digest("hex").slice(0, 32);
           e.finalUrl = r.finalUrl;
           e.fetchedAt = now();
           e.state = "ok";
@@ -241,6 +194,14 @@ export function createLegalLibrary(opts: LibraryOpts) {
           opts.onEvent?.({
             action: "legal.library_refresh",
             detail: `${where(r.finalUrl)} bytes=${r.body.length}`,
+          });
+        } else {
+          e.retryAt = now() + retry;
+          e.error = r.error;
+          if (!e.body) e.state = "error"; // إن وُجدت نسخة قديمة نُبقيها بدل أن نفقدها
+          opts.onEvent?.({
+            action: "legal.library_failed",
+            detail: `${where(item.url)} status=${r.status}`,
           });
         }
       } catch {
@@ -286,7 +247,6 @@ export function createLegalLibrary(opts: LibraryOpts) {
         pub.bytes = e.body!.length;
       }
       if (e.state === "error" && e.error) pub.error = e.error;
-      if (e.state === "ok" && e.error) pub.warning = e.error;
       return pub;
     });
   }

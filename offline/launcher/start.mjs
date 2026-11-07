@@ -4,7 +4,7 @@
 // خيارات: --no-open (لا تفتح المتصفح). متغيرات: RASD_PORT، RASD_DATA_DIR، RASD_PACK_PASSWORD (للأتمتة).
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { createReadStream, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import os from "node:os";
@@ -51,7 +51,7 @@ function localSecrets(dir) {
       /* يُعاد توليدها */
     }
   }
-  const s = { authSecret: randomBytes(32).toString("hex"), inviteCode: randomBytes(10).toString("hex") };
+  const s = { authSecret: randomBytes(32).toString("hex"), inviteCode: randomBytes(6).toString("hex") };
   writeFileSync(file, JSON.stringify(s), { mode: 0o600 });
   return s;
 }
@@ -90,7 +90,7 @@ function askHidden(question) {
         }
         if (c === "\u007f" || c === "\b") {
           if (val.length) {
-            val = Array.from(val).slice(0, -1).join(""); // يحذف حرفاً كاملاً حتى لو كان من زوج بديل (surrogate)
+            val = val.slice(0, -1);
             stdout.write("\b \b");
           }
         } else if (c >= " ") {
@@ -118,9 +118,6 @@ function cleanStale() {
     if (!name.startsWith(TMP_PREFIX)) continue;
     const dir = path.join(os.tmpdir(), name);
     try {
-      // لا نلمس إلا مجلداً حقيقياً يملكه المستخدم الحالي (لا رابطاً رمزياً ولا مجلد مستخدم آخر في /tmp مشترك)
-      const st = lstatSync(dir);
-      if (!st.isDirectory() || (typeof process.getuid === "function" && st.uid !== process.getuid())) continue;
       const pid = Number(readFileSync(path.join(dir, "owner.pid"), "utf8"));
       if (!pid || !pidAlive(pid)) rmSync(dir, { recursive: true, force: true });
     } catch {
@@ -143,8 +140,7 @@ function waitReady(port, child, ms = 60_000) {
       if (child.exitCode !== null) return reject(new Error("exited"));
       const req = http.get({ host: "127.0.0.1", port, path: "/", timeout: 2000 }, (res) => {
         res.resume();
-        if ((res.statusCode ?? 500) < 500) resolve();
-        else retry();
+        resolve();
       });
       req.on("error", retry);
       req.on("timeout", () => req.destroy());
@@ -232,18 +228,10 @@ async function main() {
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   const secrets = localSecrets(dir);
 
-  // بيانات المتصفح (التقارير المحلية) مرتبطة بالمنفذ؛ تغييره الصامت يُخفي بيانات المدقق. لذلك نتوقف افتراضياً.
   let port = PORT0;
-  if (!(await portFree(port))) {
-    if (process.env.RASD_ALLOW_OTHER_PORT !== "1") {
-      fail(
-        "",
-        `Port ${PORT0} is busy (is another copy of Rasd already running?). Close it and run again. ` +
-          `Using a different port would hide your saved reports; to accept that anyway set RASD_ALLOW_OTHER_PORT=1.`,
-      );
-    }
-    for (let i = 0; i < 10 && !(await portFree(port)); i++) port = PORT0 + i + 1;
-    say("", `Port ${PORT0} is busy, using ${port} instead. Browser data is tied to the port, so previous data will not appear.`);
+  for (let i = 0; i < 10 && !(await portFree(port)); i++) port = PORT0 + i + 1;
+  if (port !== PORT0) {
+    say("", `Port ${PORT0} is busy, using ${port} instead. Browser data is tied to the port, so previous data may not appear.`);
   }
 
   const keep = ["PATH", "Path", "SystemRoot", "SYSTEMROOT", "windir", "COMSPEC", "PATHEXT", "TEMP", "TMP", "TMPDIR", "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "LANG", "LC_ALL"];

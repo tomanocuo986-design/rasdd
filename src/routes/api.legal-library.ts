@@ -42,8 +42,6 @@ export const Route = createFileRoute("/api/legal-library")({
             "content-length": String(f.body.length),
             "cache-control": "no-store",
             "x-content-type-options": "nosniff",
-            // الملف قادم من موقع خارجي: لا يُعرض داخل أصل التطبيق (المتصفح يقرؤه بـ fetch فلا يتأثر)
-            "content-disposition": 'attachment; filename="regulation.pdf"',
             "x-final-url": encodeURIComponent(f.finalUrl),
             "x-sha": f.sha,
           },

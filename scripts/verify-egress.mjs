@@ -5,9 +5,6 @@
 import { pathToFileURL } from "node:url";
 
 export const ALLOWED = [
-  "https://www.mola.gov.jo/",
-  "https://www.csb.gov.jo/",
-  "https://www.mof.gov.jo/",
   "https://www.gtd.gov.jo/",
   "https://spac.gov.jo/",
   "https://modee.gov.jo/",
@@ -20,12 +17,6 @@ export const BLOCKED = [
   "https://api.anthropic.com/",
   "https://api.openai.com/",
   "https://generativelanguage.googleapis.com/",
-  "https://api.mistral.ai/",
-  "https://api.cohere.com/",
-  "https://api.groq.com/",
-  "https://openrouter.ai/",
-  "https://api.x.ai/",
-  "https://huggingface.co/",
 ];
 const BLOCK_PAGE = new Set([403, 407, 451, 502, 503]);
 

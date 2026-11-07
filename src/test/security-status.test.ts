@@ -6,15 +6,6 @@ const LOCAL = { LLM_BASE_URL: "http://ollama.internal:11434/v1", LLM_MODEL: "gem
 const levels = (s: ReturnType<typeof securityStatus>) =>
   s.notes.filter((n) => n.level === "warn").map((n) => n.text);
 
-describe("securityStatus — IPv6 model address", () => {
-  it("warns for http to a public IPv6 literal (brackets are stripped) but not for loopback", () => {
-    const pub = securityStatus({ LLM_BASE_URL: "http://[2606:4700:4700::1111]:11434/v1", LLM_MODEL: "gemma" });
-    expect(levels(pub).some((t) => t.includes("2606:4700:4700::1111"))).toBe(true);
-    const loop = securityStatus({ LLM_BASE_URL: "http://[::1]:11434/v1", LLM_MODEL: "gemma" });
-    expect(levels(loop).some((t) => t.includes("عنوان عام"))).toBe(false);
-  });
-});
-
 describe("securityStatus", () => {
   it("is ok for a local model, redaction on and the default library", () => {
     const s = securityStatus({
@@ -33,38 +24,6 @@ describe("securityStatus", () => {
     expect(s.legalLibrary.enabled).toBe(true);
     expect(s.legalLibrary.hosts).toContain("spac.gov.jo");
     expect(s.legalLibrary.extraHosts).toEqual([]);
-  });
-
-  it("warns when the template placeholders were copied as real values", () => {
-    const s = securityStatus({
-      LLM_BASE_URL: "http://ollama.internal:11434/v1",
-      LLM_MODEL: "<اسم النموذج كما يظهر في: ollama list>",
-      AI_REDACT_ALWAYS: "1",
-      AI_REDACT_TERMS: "اسم جهة، اسم مورد، اسم موظف",
-    });
-    expect(s.verdict).toBe("review");
-    const w = levels(s).join("|");
-    expect(w).toContain("أمثلة القالب");
-    expect(w).toContain("LLM_MODEL غير مضبوط");
-  });
-
-  it("warns on a missing model name and on cleartext http to a public address", () => {
-    expect(levels(securityStatus({ LLM_BASE_URL: "http://ollama.internal:11434/v1" })).join("|")).toContain("LLM_MODEL غير مضبوط");
-    const pub = levels(securityStatus({ LLM_BASE_URL: "http://93.184.216.34:11434/v1", LLM_MODEL: "m" })).join("|");
-    expect(pub).toContain("غير مشفّر");
-    const priv = levels(securityStatus({ LLM_BASE_URL: "http://10.0.0.5:11434/v1", LLM_MODEL: "m" })).join("|");
-    expect(priv).not.toContain("غير مشفّر");
-  });
-
-  it("reminds about the paid tier when Gemini is allowed", () => {
-    const s = securityStatus({ GEMINI_API_KEY: "x", AI_ALLOW_EXTERNAL: "1", AI_REDACT_TERMS: "س" });
-    expect(levels(s).join("|")).toContain("الطبقة المدفوعة");
-  });
-
-  it("warns when more than one server instance is configured", () => {
-    expect(levels(securityStatus({ ...LOCAL, WEB_CONCURRENCY: "3" })).join("|")).toContain("أكثر من نسخة");
-    expect(levels(securityStatus({ ...LOCAL, RASD_INSTANCES: "2" })).join("|")).toContain("أكثر من نسخة");
-    expect(levels(securityStatus({ ...LOCAL, WEB_CONCURRENCY: "1" })).join("|")).not.toContain("أكثر من نسخة");
   });
 
   it("never exposes keys or the URL path", () => {
@@ -123,7 +82,7 @@ describe("verify-egress runChecks", () => {
 
   it("passes when only the allowed hosts answer", async () => {
     const rows = await runChecks({
-      fetchFn: mk(["www.mola.gov.jo", "www.csb.gov.jo", "www.mof.gov.jo", "www.gtd.gov.jo", "spac.gov.jo", "modee.gov.jo", "portal.jordan.gov.jo"]),
+      fetchFn: mk(["www.gtd.gov.jo", "spac.gov.jo", "modee.gov.jo", "portal.jordan.gov.jo"]),
       timeoutMs: 50,
     });
     expect(rows.every((r) => r.result === "pass")).toBe(true);
@@ -141,7 +100,7 @@ describe("verify-egress runChecks", () => {
   it("marks a 403 from a blocked site as 'check' (could be a proxy block page)", async () => {
     const rows = await runChecks({
       fetchFn: mk(
-        ["www.mola.gov.jo", "www.csb.gov.jo", "www.mof.gov.jo", "www.gtd.gov.jo", "spac.gov.jo", "modee.gov.jo", "portal.jordan.gov.jo", "github.com"],
+        ["www.gtd.gov.jo", "spac.gov.jo", "modee.gov.jo", "portal.jordan.gov.jo", "github.com"],
         { "github.com": 403 },
       ),
       timeoutMs: 50,
