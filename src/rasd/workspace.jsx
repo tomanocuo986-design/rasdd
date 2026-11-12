@@ -32,7 +32,8 @@ import {
   saveRegulation,
   deleteRegulation,
   updateRegulationMeta,
-} from "./regulations-db";
+} from "./secure-regulations";
+import { VaultGate } from "./VaultGate";
 import { extractPdfPages, extractPdfText } from "./pdf-text";
 import { isGarbled, repairArabic } from "./arabic-text.js";
 import BackupPanel from "./BackupPanel";
@@ -3652,7 +3653,7 @@ var auditNav = [
   { id: "rules", label: "الأنظمة والتعليمات", icon: BookOpen, tab: "rules" },
   { id: "pastreports", label: "التقارير السابقة", icon: History, tab: "reports" },
 ];
-function Workspace() {
+function WorkspaceInner() {
   const [view, setView] = (0, import_react.useState)("overview");
   const [entries, setEntries] = (0, import_react.useState)([]);
   const [sectors, setSectors] = (0, import_react.useState)([]);
@@ -5442,6 +5443,11 @@ function Workspace() {
         }),
       }),
     ],
+  });
+}
+function Workspace() {
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VaultGate, {
+    children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WorkspaceInner, {}),
   });
 }
 //#endregion

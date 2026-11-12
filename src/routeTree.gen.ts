@@ -17,8 +17,8 @@ import { Route as ApiDocReviewRouteImport } from './routes/api.doc-review'
 import { Route as ApiHealthRouteImport } from './routes/api.health'
 import { Route as ApiLegalFetchRouteImport } from './routes/api.legal-fetch'
 import { Route as ApiLegalLibraryRouteImport } from './routes/api.legal-library'
-import { Route as ApiSecurityStatusRouteImport } from './routes/api.security-status'
 import { Route as ApiOfflinePackageRouteImport } from './routes/api.offline-package'
+import { Route as ApiSecurityStatusRouteImport } from './routes/api.security-status'
 import { Route as ApiWorkspacesRouteImport } from './routes/api.workspaces'
 
 const IndexRoute = IndexRouteImport.update({
@@ -61,14 +61,14 @@ const ApiLegalLibraryRoute = ApiLegalLibraryRouteImport.update({
   path: '/api/legal-library',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSecurityStatusRoute = ApiSecurityStatusRouteImport.update({
-  id: '/api/security-status',
-  path: '/api/security-status',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiOfflinePackageRoute = ApiOfflinePackageRouteImport.update({
   id: '/api/offline-package',
   path: '/api/offline-package',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSecurityStatusRoute = ApiSecurityStatusRouteImport.update({
+  id: '/api/security-status',
+  path: '/api/security-status',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiWorkspacesRoute = ApiWorkspacesRouteImport.update({
@@ -86,8 +86,8 @@ export interface FileRoutesByFullPath {
   '/api/health': typeof ApiHealthRoute
   '/api/legal-fetch': typeof ApiLegalFetchRoute
   '/api/legal-library': typeof ApiLegalLibraryRoute
-  '/api/security-status': typeof ApiSecurityStatusRoute
   '/api/offline-package': typeof ApiOfflinePackageRoute
+  '/api/security-status': typeof ApiSecurityStatusRoute
   '/api/workspaces': typeof ApiWorkspacesRoute
 }
 export interface FileRoutesByTo {
@@ -99,8 +99,8 @@ export interface FileRoutesByTo {
   '/api/health': typeof ApiHealthRoute
   '/api/legal-fetch': typeof ApiLegalFetchRoute
   '/api/legal-library': typeof ApiLegalLibraryRoute
-  '/api/security-status': typeof ApiSecurityStatusRoute
   '/api/offline-package': typeof ApiOfflinePackageRoute
+  '/api/security-status': typeof ApiSecurityStatusRoute
   '/api/workspaces': typeof ApiWorkspacesRoute
 }
 export interface FileRoutesById {
@@ -113,8 +113,8 @@ export interface FileRoutesById {
   '/api/health': typeof ApiHealthRoute
   '/api/legal-fetch': typeof ApiLegalFetchRoute
   '/api/legal-library': typeof ApiLegalLibraryRoute
-  '/api/security-status': typeof ApiSecurityStatusRoute
   '/api/offline-package': typeof ApiOfflinePackageRoute
+  '/api/security-status': typeof ApiSecurityStatusRoute
   '/api/workspaces': typeof ApiWorkspacesRoute
 }
 export interface FileRouteTypes {
@@ -128,8 +128,8 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/legal-fetch'
     | '/api/legal-library'
-    | '/api/security-status'
     | '/api/offline-package'
+    | '/api/security-status'
     | '/api/workspaces'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -141,8 +141,8 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/legal-fetch'
     | '/api/legal-library'
-    | '/api/security-status'
     | '/api/offline-package'
+    | '/api/security-status'
     | '/api/workspaces'
   id:
     | '__root__'
@@ -154,8 +154,8 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/legal-fetch'
     | '/api/legal-library'
-    | '/api/security-status'
     | '/api/offline-package'
+    | '/api/security-status'
     | '/api/workspaces'
   fileRoutesById: FileRoutesById
 }
@@ -168,8 +168,8 @@ export interface RootRouteChildren {
   ApiHealthRoute: typeof ApiHealthRoute
   ApiLegalFetchRoute: typeof ApiLegalFetchRoute
   ApiLegalLibraryRoute: typeof ApiLegalLibraryRoute
-  ApiSecurityStatusRoute: typeof ApiSecurityStatusRoute
   ApiOfflinePackageRoute: typeof ApiOfflinePackageRoute
+  ApiSecurityStatusRoute: typeof ApiSecurityStatusRoute
   ApiWorkspacesRoute: typeof ApiWorkspacesRoute
 }
 
@@ -231,18 +231,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiLegalLibraryRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/security-status': {
-      id: '/api/security-status'
-      path: '/api/security-status'
-      fullPath: '/api/security-status'
-      preLoaderRoute: typeof ApiSecurityStatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/offline-package': {
       id: '/api/offline-package'
       path: '/api/offline-package'
       fullPath: '/api/offline-package'
       preLoaderRoute: typeof ApiOfflinePackageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/security-status': {
+      id: '/api/security-status'
+      path: '/api/security-status'
+      fullPath: '/api/security-status'
+      preLoaderRoute: typeof ApiSecurityStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/workspaces': {
@@ -264,8 +264,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthRoute: ApiHealthRoute,
   ApiLegalFetchRoute: ApiLegalFetchRoute,
   ApiLegalLibraryRoute: ApiLegalLibraryRoute,
-  ApiSecurityStatusRoute: ApiSecurityStatusRoute,
   ApiOfflinePackageRoute: ApiOfflinePackageRoute,
+  ApiSecurityStatusRoute: ApiSecurityStatusRoute,
   ApiWorkspacesRoute: ApiWorkspacesRoute,
 }
 export const routeTree = rootRouteImport
