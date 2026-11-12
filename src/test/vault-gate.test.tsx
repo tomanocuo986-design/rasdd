@@ -5,6 +5,33 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 const PW = "كلمة-مرور-قوية-123";
 
+class MemStorage {
+  m = new Map<string, string>();
+  get length() {
+    return this.m.size;
+  }
+  key(i: number) {
+    return [...this.m.keys()][i] ?? null;
+  }
+  getItem(k: string) {
+    return this.m.has(k) ? (this.m.get(k) as string) : null;
+  }
+  setItem(k: string, v: string) {
+    this.m.set(String(k), String(v));
+  }
+  removeItem(k: string) {
+    this.m.delete(k);
+  }
+  clear() {
+    this.m.clear();
+  }
+}
+
+function freshStorage() {
+  Object.defineProperty(globalThis, "Storage", { value: MemStorage, configurable: true, writable: true });
+  Object.defineProperty(globalThis, "localStorage", { value: new MemStorage(), configurable: true, writable: true });
+}
+
 async function load(mode: string) {
   vi.resetModules();
   vi.stubEnv("MODE", mode);
@@ -16,13 +43,12 @@ async function load(mode: string) {
 
 beforeEach(() => {
   Object.defineProperty(globalThis, "crypto", { value: webcrypto, configurable: true });
-  localStorage.clear();
+  freshStorage();
 });
 
 afterEach(async () => {
   cleanup();
   vi.unstubAllEnvs();
-  localStorage.clear();
 });
 
 describe("VaultGate", () => {
