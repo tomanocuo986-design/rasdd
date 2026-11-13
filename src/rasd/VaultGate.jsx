@@ -18,6 +18,7 @@ import { VaultEscrowPanel } from "./VaultEscrowPanel.jsx";
 
 const env = (typeof import.meta !== "undefined" && import.meta.env) || {};
 const OFF = env.VITE_VAULT === "off" || env.MODE === "test";
+export const VAULT_ENABLED = !OFF;
 const IDLE = Number(env.VITE_VAULT_IDLE_MIN) > 0 ? Number(env.VITE_VAULT_IDLE_MIN) : 15;
 const MIN_LENGTH = 10;
 

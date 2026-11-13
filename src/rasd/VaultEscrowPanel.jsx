@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createEscrow, escrowInfo, revokeEscrow } from "./secure-vault.js";
 
 const field =
@@ -23,6 +23,11 @@ const stamp = (iso) => {
   }
 };
 
+const OPEN_EVENT = "rasd-open-escrow";
+
+// يفتح لوحة مفتاح الطوارئ من أي مكان (مثل الشريط الجانبي).
+export const openEscrowPanel = () => window.dispatchEvent(new Event(OPEN_EVENT));
+
 export function VaultEscrowPanel({ defaultOpen = false, afterRecovery = false }) {
   const [open, setOpen] = useState(defaultOpen);
   const [info, setInfo] = useState(() => escrowInfo());
@@ -32,6 +37,15 @@ export function VaultEscrowPanel({ defaultOpen = false, afterRecovery = false })
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const show = () => {
+      setInfo(escrowInfo());
+      setOpen(true);
+    };
+    window.addEventListener(OPEN_EVENT, show);
+    return () => window.removeEventListener(OPEN_EVENT, show);
+  }, []);
 
   const run = async (action) => {
     if (busy || !password) return;
@@ -97,17 +111,7 @@ export function VaultEscrowPanel({ defaultOpen = false, afterRecovery = false })
     setError("");
   };
 
-  if (!open)
-    return (
-      <button
-        type="button"
-        data-testid="vault-escrow-open"
-        onClick={() => setOpen(true)}
-        className="fixed bottom-3 left-24 z-50 rounded-md border border-input bg-background px-3 py-1.5 text-xs text-foreground shadow hover:bg-accent"
-      >
-        مفتاح الطوارئ
-      </button>
-    );
+  if (!open) return null;
 
   return (
     <div
@@ -115,7 +119,7 @@ export function VaultEscrowPanel({ defaultOpen = false, afterRecovery = false })
       aria-label="مفتاح الطوارئ للتخزين المشفّر"
       data-testid="vault-escrow-panel"
       dir="rtl"
-      className="fixed bottom-14 left-3 z-50 w-[min(94vw,26rem)] space-y-3 rounded-lg border border-border bg-background p-4 text-sm text-foreground shadow-lg"
+      className="fixed left-1/2 top-1/2 z-50 w-[min(94vw,26rem)] -translate-x-1/2 -translate-y-1/2 space-y-3 rounded-lg border border-border bg-background p-4 text-sm text-foreground shadow-lg"
     >
       <h2 className="text-base font-semibold">مفتاح الطوارئ</h2>
       {afterRecovery ? (

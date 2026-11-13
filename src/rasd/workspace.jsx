@@ -7,7 +7,7 @@ import {
   Check, ArrowLeft, Bell, Activity, CircleHelp as CircleQuestionMark, BookOpen, FileText,
   SlidersHorizontal, FileChartColumn, Settings2, Radar, Plus, Globe, History, Sun, Search,
   LayoutGrid, Upload, ShieldCheck, Moon, Trash2, ShieldAlert, X, Save, FileSpreadsheet,
-  Building2, Download, FileDown,
+  Building2, Download, FileDown, KeyRound,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { cva } from "class-variance-authority";
@@ -33,7 +33,8 @@ import {
   deleteRegulation,
   updateRegulationMeta,
 } from "./secure-regulations";
-import { VaultGate } from "./VaultGate";
+import { VaultGate, VAULT_ENABLED } from "./VaultGate";
+import { openEscrowPanel } from "./VaultEscrowPanel.jsx";
 import { extractPdfPages, extractPdfText } from "./pdf-text";
 import { isGarbled, repairArabic } from "./arabic-text.js";
 import BackupPanel from "./BackupPanel";
@@ -3930,6 +3931,21 @@ function WorkspaceInner() {
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
             className: "side-bottom",
             children: [
+              VAULT_ENABLED &&
+                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Button, {
+                  variant: "ghost",
+                  className: "nav-item",
+                  title: "مفتاح الطوارئ",
+                  "data-testid": "nav-escrow",
+                  onClick: () => openEscrowPanel(),
+                  children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(KeyRound, {}),
+                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+                      className: "nav-text",
+                      children: "مفتاح الطوارئ",
+                    }),
+                  ],
+                }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Button, {
                 variant: "ghost",
                 className: "nav-item",

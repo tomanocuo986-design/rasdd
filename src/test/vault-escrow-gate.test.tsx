@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { webcrypto } from "node:crypto";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const PW = "كلمة-مرور-قوية-123";
 const NEW_PW = "كلمة-مرور-جديدة-456";
@@ -85,7 +85,8 @@ describe("VaultGate escrow flow", () => {
     fireEvent.submit(container.querySelector("form")!);
     await waitFor(() => expect(screen.getByText("المحتوى")).toBeTruthy(), { timeout: 10000 });
 
-    fireEvent.click(screen.getByTestId("vault-escrow-open"));
+    const { openEscrowPanel } = await import("@/rasd/VaultEscrowPanel.jsx");
+    act(() => openEscrowPanel());
     fireEvent.change(screen.getByLabelText("كلمة مرور التخزين للتأكيد"), {
       target: { value: "خطأ-خطأ-خطأ-خطأ" },
     });
