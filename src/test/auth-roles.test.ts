@@ -173,3 +173,27 @@ describe("server-side sessions: revocation", () => {
     for (const c of cookies) expect((await me(c))?.employeeId).toBe("S-CONC");
   });
 });
+
+describe("audit endpoint target filter", () => {
+  it("filters by target, keeps full-chain verification, and exposes matched count", async () => {
+    const rev = cookieOf(await auth.handlePost(post({ action: "login", employeeId: "REV1", password: PW })));
+    const aud = cookieOf(await register("U300"));
+    for (const target of ["obs-a", "obs-b", "obs-a"]) {
+      const r = await auth.handlePost(post({ action: "event", event: "ui.finding.approve", target }, aud));
+      expect(r.status).toBe(200);
+    }
+    const body = await (await auth.handleGet(get("?audit=1&limit=500&target=obs-a", rev))).json();
+    expect(body.verify.ok).toBe(true);
+    expect(body.matched).toBe(2);
+    expect(body.events.every((e: { target: string }) => e.target === "obs-a")).toBe(true);
+    expect(body.total).toBeGreaterThan(body.matched);
+  });
+
+  it("accepts the vault escrow events and rejects unknown ones", async () => {
+    const aud = cookieOf(await register("U301"));
+    for (const event of ["ui.vault.escrow_create", "ui.vault.escrow_use", "ui.vault.escrow_revoke", "ui.vault.escrow_failed"]) {
+      expect((await auth.handlePost(post({ action: "event", event, target: "vault", detail: "id=AB12" }, aud))).status).toBe(200);
+    }
+    expect((await auth.handlePost(post({ action: "event", event: "ui.vault.other" }, aud))).status).toBe(400);
+  });
+});

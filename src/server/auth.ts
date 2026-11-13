@@ -358,8 +358,11 @@ export async function handleGet(req: Request) {
     if (!can(user.role, "audit.read")) return json(403, { error: "forbidden" });
     const all = await auditStore().all();
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 200, 1), MAX_LIST);
-    await logEvent({ actor: user.employeeId, role: user.role, action: "audit.read", detail: `limit=${limit}` });
-    return json(200, { verify: verifyChain(all), total: all.length, events: all.slice(-limit).reverse() });
+    const target = (url.searchParams.get("target") ?? "").trim().slice(0, 300);
+    const view = target ? all.filter((e) => e.target === target) : all;
+    const detail = target ? `limit=${limit} target=${target.slice(0, 100)}` : `limit=${limit}`;
+    await logEvent({ actor: user.employeeId, role: user.role, action: "audit.read", detail });
+    return json(200, { verify: verifyChain(all), total: all.length, matched: view.length, events: view.slice(-limit).reverse() });
   }
   if (url.searchParams.get("users") === "1") {
     if (!user) return json(401, { error: "unauthenticated" });

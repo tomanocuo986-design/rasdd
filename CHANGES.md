@@ -1,3 +1,19 @@
+# دفعة «مفتاح طوارئ الخزنة + السجل المسلسل المرئي»
+
+- **مفتاح الطوارئ:** `secure-vault.js` صار بمفتاح جذر عشوائي مغلَّف بكلمة المرور (إصدار 2) مع بقاء الخزنات القديمة تعمل دون إعادة تشفير. دوال جديدة: `createEscrow` و`revokeEscrow` و`recoverVault` و`escrowInfo` و`hasEscrow`. المفتاح 256 بت يعمل مرة واحدة ويُبطَل بعد استعماله. لوحة `VaultEscrowPanel.jsx` وشاشة استرداد في `VaultGate.jsx`.
+- **السجل:** أربعة أحداث جديدة في `CLIENT_EVENTS` (`ui.vault.escrow_create` و`_use` و`_revoke` و`_failed`) تُختم باسم الحساب في سلسلة التجزئة. `GET /api/auth?audit=1` يقبل الآن `target` للتصفية ويُرجع `matched`، والتحقق يبقى على السلسلة كاملة.
+- **العرض المرئي:** `AuditTrailTimeline.tsx` و`AuditTrailPanel.tsx` على المسار `/audit` للمراجع والمدير. حكم السلامة يأتي من `verifyChain` في الخادم لا من المتصفح، وتُلوَّن نقطة الكسر والأحداث التي بعدها.
+- **اختبارات:** `secure-vault-escrow` (9) و`vault-escrow-gate` (1) و`audit-trail-timeline` (6) وحالتان جديدتان في `auth-roles`. الحزمة الكاملة: 439 نجحت، وفشل اختباران في `secure-regulations` و`offline-package` ويفشلان على الكود الأصلي نفسه (بيئة jsdom).
+- **حدود:** لم يُشغَّل `vite build` ولم تُفحص الواجهة بصرياً في متصفح؛ موضع زر «مفتاح الطوارئ» (أسفل اليسار) يحتاج مراجعة بصرية بجانب شريط الحساب. تفاصيل القرار والحدود: `docs/VAULT.ar.md`.
+
+# دفعة «فحوص الكفالات والائتلافات + محاكي ردود الجهة»
+
+- **القواعد:** `tender-guarantees.js` (والمقابل في `python/audit_engine.py`) على `Tenders_Records`: كفالة حسن التنفيذ دون النسبة النظامية، كفالة تنتهي قبل العقد بالمهلة المطلوبة، إحالة على ائتلاف دون اتفاقية مصدّقة. خمسة حقول اختيارية جديدة (`guarantee_value`، `guarantee_expiry`، `contract_end`، `is_consortium`، `consortium_agreement`) في المحركين و`datasets.json`.
+- **الأرقام النظامية:** معاملان جديدان `guaranteeMinPct` و`guaranteeCoverDays` (0 = غير مفعّل) يُدخلهما المدقق من النص النافذ؛ لم يُكتب أي رقم أو اسم نظام من الذاكرة. قاعدة الائتلاف بلا رقم وتعمل دائمًا. أرقام المواد تُستكمل من `legal-articles.json` (قاعدة `tender`).
+- **المحاكي:** `auditee-simulator.js` و`AuditeeSimulator.jsx` داخل بطاقة المسودة. يمر عبر `/api/chat` (بوابة السرية والحجب وصلاحية `chat.use`)، والاستشهاد القانوني من مقاطع المكتبة فقط، ومخرجاته استشارية ولا تدخل التقرير.
+- **اختبارات:** `python/test_tender_guarantees.py` (4، مع بقية اختبارات python: 18 نجحت) و`tender-guarantees.test.ts` و`auditee-simulator.test.ts` لـ vitest.
+- **حدود:** لم يُشغَّل `npm test` ولا `vite build` (لا node_modules في بيئة العمل)؛ دالتا القواعد والمحاكي اختُبرتا بـ Node مباشرة، وملف `AuditeeSimulator.jsx` وملفا vitest لم يُشغَّلا. المحاكي يحتاج نموذجًا مضبوطًا (`LLM_BASE_URL` محلي). أُجّلت ميزات: مفتاح طوارئ الخزنة، السجل البصري، الإملاء الصوتي.
+
 # دفعة «تشفير التخزين المحلي وختم سلامة الأنظمة»
 
 - **التشفير:** `secure-vault.js` يشفّر مفاتيح `rasd-*` في `localStorage` بـ AES-256-GCM بمفتاح مشتق من كلمة مرور المدقق (PBKDF2 ثم HKDF)، شفافاً لباقي الوحدات. يرقّي البيانات القديمة، ويربط كل قيمة باسم مفتاحها، ويقفل تلقائياً بعد خمول.

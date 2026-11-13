@@ -2,6 +2,9 @@ const PREFIX = "rasdenc1:";
 const META_KEY = "rasd-vault-meta";
 const CHECK = "rasd-vault-ok";
 const ITERATIONS = 600000;
+const IV_LEN = 12;
+const ROOT_LEN = 32;
+const CODE_LEN = 32;
 const SKIP = /session|auth|token|csrf|^rasd-vault-|^rasd-agent-write$/i;
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -139,28 +142,91 @@ export async function macVerify(keys, bytes, mac) {
   }
 }
 
-async function deriveKeys(password, salt, iterations) {
+const rand = (n) => globalThis.crypto.getRandomValues(new Uint8Array(n));
+
+const toHex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+
+const AES_KEK = { name: "AES-GCM", length: 256 };
+
+async function deriveBits(password, salt, iterations) {
   const subtle = globalThis.crypto.subtle;
-  const base = await subtle.importKey("raw", enc.encode(String(password).normalize("NFKC")), "PBKDF2", false, [
-    "deriveBits",
-  ]);
-  const bits = await subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations }, base, 256);
-  const hkdf = await subtle.importKey("raw", bits, "HKDF", false, ["deriveKey"]);
-  const aes = await subtle.deriveKey(
-    { name: "HKDF", hash: "SHA-256", salt, info: enc.encode("rasd-aes-gcm") },
-    hkdf,
-    { name: "AES-GCM", length: 256 },
+  const base = await subtle.importKey(
+    "raw",
+    enc.encode(String(password).normalize("NFKC")),
+    "PBKDF2",
     false,
-    ["encrypt", "decrypt"],
+    ["deriveBits"],
   );
-  const mac = await subtle.deriveKey(
-    { name: "HKDF", hash: "SHA-256", salt, info: enc.encode("rasd-hmac") },
-    hkdf,
-    { name: "HMAC", hash: "SHA-256", length: 256 },
+  return new Uint8Array(
+    await subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations }, base, 256),
+  );
+}
+
+async function hkdfKey(secret, salt, info, algorithm, usages) {
+  const subtle = globalThis.crypto.subtle;
+  const base = await subtle.importKey("raw", secret, "HKDF", false, ["deriveKey"]);
+  return subtle.deriveKey(
+    { name: "HKDF", hash: "SHA-256", salt, info: enc.encode(info) },
+    base,
+    algorithm,
     false,
+    usages,
+  );
+}
+
+async function keysFromRoot(root, salt) {
+  const aes = await hkdfKey(root, salt, "rasd-aes-gcm", { name: "AES-GCM", length: 256 }, [
+    "encrypt",
+    "decrypt",
+  ]);
+  const mac = await hkdfKey(
+    root,
+    salt,
+    "rasd-hmac",
+    { name: "HMAC", hash: "SHA-256", length: 256 },
     ["sign", "verify"],
   );
   return { aes, mac };
+}
+
+const passwordKek = (bits, salt) =>
+  hkdfKey(bits, salt, "rasd-kek", AES_KEK, ["encrypt", "decrypt"]);
+
+const recoveryKek = (secret, salt) =>
+  hkdfKey(secret, salt, "rasd-recovery", AES_KEK, ["encrypt", "decrypt"]);
+
+async function wrapRoot(kek, root, aad) {
+  const iv = rand(IV_LEN);
+  const ct = new Uint8Array(
+    await globalThis.crypto.subtle.encrypt(
+      { name: "AES-GCM", iv, additionalData: enc.encode(aad) },
+      kek,
+      root,
+    ),
+  );
+  const out = new Uint8Array(IV_LEN + ct.length);
+  out.set(iv, 0);
+  out.set(ct, IV_LEN);
+  return b64e(out);
+}
+
+async function unwrapRoot(kek, wrapped, aad) {
+  const data = b64d(wrapped);
+  return new Uint8Array(
+    await globalThis.crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: data.slice(0, IV_LEN), additionalData: enc.encode(aad) },
+      kek,
+      data.slice(IV_LEN),
+    ),
+  );
+}
+
+const formatCode = (secret) => toHex(secret).toUpperCase().match(/.{8}/g).join("-");
+
+function parseCode(code) {
+  const hex = String(code ?? "").replace(/[\s-]/g, "");
+  if (!/^[0-9a-fA-F]{64}$/.test(hex)) return null;
+  return Uint8Array.from(hex.match(/.{2}/g), (h) => parseInt(h, 16));
 }
 
 const fns = () => {
@@ -173,7 +239,9 @@ const readMeta = () => {
   try {
     const raw = fns().get.call(safeLocal(), META_KEY);
     const meta = raw ? JSON.parse(raw) : null;
-    return meta && meta.salt && meta.check && meta.iter ? meta : null;
+    if (!meta || !meta.salt || !meta.check || !meta.iter) return null;
+    if (meta.v === 2 && (!meta.wrap || !meta.rootSalt)) return null;
+    return meta;
   } catch {
     return null;
   }
@@ -366,15 +434,49 @@ async function start(keys, options = {}) {
   armIdle(s);
 }
 
+const writeMeta = (meta) => fns().set.call(safeLocal(), META_KEY, JSON.stringify(meta));
+
+async function openRoot(password, meta) {
+  const salt = b64d(meta.salt);
+  const bits = await deriveBits(password, salt, meta.iter);
+  if (meta.v !== 2) return { root: bits, rootSalt: salt, bits };
+  try {
+    const root = await unwrapRoot(await passwordKek(bits, salt), meta.wrap, "rasd-root");
+    return { root, rootSalt: b64d(meta.rootSalt), bits };
+  } catch {
+    throw new VaultError("wrong_password");
+  }
+}
+
+async function verifiedKeys(root, rootSalt, meta) {
+  const keys = await keysFromRoot(root, rootSalt);
+  try {
+    return (await openText(keys, meta.check, "meta")) === CHECK ? keys : null;
+  } catch {
+    return null;
+  }
+}
+
+async function authenticate(password, meta) {
+  const { root, rootSalt, bits } = await openRoot(password, meta);
+  const keys = await verifiedKeys(root, rootSalt, meta);
+  if (!keys) throw new VaultError("wrong_password");
+  return { root, rootSalt, bits, keys };
+}
+
 export async function createVault(password, options = {}) {
   if (!isSupported()) throw new VaultError("unsupported");
   if (readMeta()) throw new VaultError("exists");
   if (typeof password !== "string" || password.length < 8) throw new VaultError("weak_password");
   const iter = Math.max(1000, options.iterations ?? ITERATIONS);
-  const salt = globalThis.crypto.getRandomValues(new Uint8Array(16));
-  const keys = await deriveKeys(password, salt, iter);
+  const salt = rand(16);
+  const rootSalt = rand(16);
+  const root = rand(ROOT_LEN);
+  const bits = await deriveBits(password, salt, iter);
+  const wrap = await wrapRoot(await passwordKek(bits, salt), root, "rasd-root");
+  const keys = await keysFromRoot(root, rootSalt);
   const check = await sealText(keys, CHECK, "meta");
-  fns().set.call(safeLocal(), META_KEY, JSON.stringify({ v: 1, iter, salt: b64e(salt), check }));
+  writeMeta({ v: 2, iter, salt: b64e(salt), rootSalt: b64e(rootSalt), check, wrap });
   await start(keys, options);
 }
 
@@ -383,14 +485,95 @@ export async function unlockVault(password, options = {}) {
   if (state.session) return;
   const meta = readMeta();
   if (!meta) throw new VaultError("no_vault");
-  const keys = await deriveKeys(password, b64d(meta.salt), meta.iter);
-  let ok = false;
+  const { keys } = await authenticate(password, meta);
+  await start(keys, options);
+}
+
+export function escrowInfo() {
+  const esc = readMeta()?.esc;
+  return esc ? { id: esc.id, createdAt: esc.ts } : null;
+}
+
+export const hasEscrow = () => escrowInfo() !== null;
+
+async function sealEscrow(root) {
+  const secret = rand(CODE_LEN);
+  const salt = rand(16);
+  const id = toHex(rand(6)).toUpperCase();
+  const ts = new Date().toISOString();
+  const wrap = await wrapRoot(await recoveryKek(secret, salt), root, `rasd-escrow:${id}`);
+  return { code: formatCode(secret), esc: { id, ts, salt: b64e(salt), wrap } };
+}
+
+async function upgraded(meta, auth) {
+  if (meta.v === 2) return meta;
+  const wrap = await wrapRoot(
+    await passwordKek(auth.bits, b64d(meta.salt)),
+    auth.root,
+    "rasd-root",
+  );
+  return { v: 2, iter: meta.iter, salt: meta.salt, rootSalt: meta.salt, check: meta.check, wrap };
+}
+
+export async function createEscrow(password) {
+  if (!isSupported()) throw new VaultError("unsupported");
+  if (!state.session) throw new VaultError("locked");
+  const meta = readMeta();
+  if (!meta) throw new VaultError("no_vault");
+  const auth = await authenticate(password, meta);
+  const base = await upgraded(meta, auth);
+  const { code, esc } = await sealEscrow(auth.root);
+  writeMeta({ ...base, esc });
+  emit("rasd-vault-escrow", { action: "create", id: esc.id });
+  return { code, id: esc.id, createdAt: esc.ts };
+}
+
+export async function revokeEscrow(password) {
+  if (!isSupported()) throw new VaultError("unsupported");
+  if (!state.session) throw new VaultError("locked");
+  const meta = readMeta();
+  if (!meta) throw new VaultError("no_vault");
+  await authenticate(password, meta);
+  if (!meta.esc) throw new VaultError("no_escrow");
+  const { esc, ...rest } = meta;
+  writeMeta(rest);
+  emit("rasd-vault-escrow", { action: "revoke", id: esc.id });
+}
+
+export async function recoverVault(code, newPassword, options = {}) {
+  if (!isSupported()) throw new VaultError("unsupported");
+  if (state.session) throw new VaultError("unlocked");
+  const meta = readMeta();
+  if (!meta) throw new VaultError("no_vault");
+  if (meta.v !== 2 || !meta.esc) throw new VaultError("no_escrow");
+  if (typeof newPassword !== "string" || newPassword.length < 8)
+    throw new VaultError("weak_password");
+  const id = meta.esc.id;
+  const fail = (reason) => {
+    emit("rasd-vault-escrow", { action: "failed", id });
+    return new VaultError(reason);
+  };
+  const secret = parseCode(code);
+  if (!secret) throw fail("bad_code");
+  let root;
   try {
-    ok = (await openText(keys, meta.check, "meta")) === CHECK;
+    root = await unwrapRoot(
+      await recoveryKek(secret, b64d(meta.esc.salt)),
+      meta.esc.wrap,
+      `rasd-escrow:${id}`,
+    );
   } catch {
-    ok = false;
+    throw fail("wrong_recovery_code");
   }
-  if (!ok) throw new VaultError("wrong_password");
+  const rootSalt = b64d(meta.rootSalt);
+  const keys = await verifiedKeys(root, rootSalt, meta);
+  if (!keys) throw fail("wrong_recovery_code");
+  const iter = Math.max(1000, options.iterations ?? ITERATIONS);
+  const salt = rand(16);
+  const bits = await deriveBits(newPassword, salt, iter);
+  const wrap = await wrapRoot(await passwordKek(bits, salt), root, "rasd-root");
+  writeMeta({ v: 2, iter, salt: b64e(salt), rootSalt: meta.rootSalt, check: meta.check, wrap });
+  emit("rasd-vault-escrow", { action: "use", id });
   await start(keys, options);
 }
 

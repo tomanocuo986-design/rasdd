@@ -29,3 +29,10 @@ export function createVault(password: string, options?: VaultOptions): Promise<v
 export function unlockVault(password: string, options?: VaultOptions): Promise<void>;
 export function lockVault(reason?: string): Promise<void>;
 export function resetVault(): Promise<void>;
+export type EscrowInfo = { id: string; createdAt: string };
+export type EscrowIssue = { code: string; id: string; createdAt: string };
+export function escrowInfo(): EscrowInfo | null;
+export function hasEscrow(): boolean;
+export function createEscrow(password: string): Promise<EscrowIssue>;
+export function revokeEscrow(password: string): Promise<void>;
+export function recoverVault(code: string, newPassword: string, options?: VaultOptions): Promise<void>;
