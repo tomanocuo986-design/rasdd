@@ -1,3 +1,9 @@
+# دفعة «إزالة التخزين المشفّر ومفتاح الطوارئ»
+
+- **أُزيل:** `secure-vault.js` و`secure-vault.d.ts` و`VaultGate.jsx` و`VaultEscrowPanel.jsx` و`secure-regulations.js` و`docs/VAULT.ar.md` واختباراتها. المكتبة القانونية تقرأ من `regulations-db` مباشرة، وأُزيل `VITE_VAULT` من `.env.example`. صار `Workspace` يعرض `WorkspaceInner` مباشرة بلا شاشة كلمة مرور التخزين، وحُذف زر «مفتاح الطوارئ» من الشريط الجانبي.
+- **السجل:** حُذفت أحداث `ui.vault.escrow_*` الأربعة من `CLIENT_EVENTS` وتسمياتها من `AuditTrailTimeline.tsx` واختبارها من `auth-roles`. العرض المرئي للسجل المسلسل باقٍ.
+- **تنبيه:** البيانات التي شُفّرت سابقاً في `localStorage` وIndexedDB تبقى مشفّرة ولا تُقرأ دون الخزنة؛ فك تشفيرها قبل نشر هذه الدفعة. وأي ملف خارج هذه الحزمة يستورد `secure-vault.js` (مثل `secure-regulations.js`) يجب أن يُعدَّل.
+
 # دفعة «مفتاح طوارئ الخزنة + السجل المسلسل المرئي»
 
 - **مفتاح الطوارئ:** `secure-vault.js` صار بمفتاح جذر عشوائي مغلَّف بكلمة المرور (إصدار 2) مع بقاء الخزنات القديمة تعمل دون إعادة تشفير. دوال جديدة: `createEscrow` و`revokeEscrow` و`recoverVault` و`escrowInfo` و`hasEscrow`. المفتاح 256 بت يعمل مرة واحدة ويُبطَل بعد استعماله. لوحة `VaultEscrowPanel.jsx` وشاشة استرداد في `VaultGate.jsx`.

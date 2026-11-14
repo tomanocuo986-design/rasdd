@@ -55,10 +55,6 @@ export const CLIENT_EVENTS = [
   "ui.legal.override",
   "ui.backup.restore",
   "ui.sync.push",
-  "ui.vault.escrow_create",
-  "ui.vault.escrow_use",
-  "ui.vault.escrow_revoke",
-  "ui.vault.escrow_failed",
 ] as const;
 export type ClientEvent = (typeof CLIENT_EVENTS)[number];
 export const isClientEvent = (v: unknown): v is ClientEvent => (CLIENT_EVENTS as readonly string[]).includes(String(v));

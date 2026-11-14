@@ -188,12 +188,4 @@ describe("audit endpoint target filter", () => {
     expect(body.events.every((e: { target: string }) => e.target === "obs-a")).toBe(true);
     expect(body.total).toBeGreaterThan(body.matched);
   });
-
-  it("accepts the vault escrow events and rejects unknown ones", async () => {
-    const aud = cookieOf(await register("U301"));
-    for (const event of ["ui.vault.escrow_create", "ui.vault.escrow_use", "ui.vault.escrow_revoke", "ui.vault.escrow_failed"]) {
-      expect((await auth.handlePost(post({ action: "event", event, target: "vault", detail: "id=AB12" }, aud))).status).toBe(200);
-    }
-    expect((await auth.handlePost(post({ action: "event", event: "ui.vault.other" }, aud))).status).toBe(400);
-  });
 });

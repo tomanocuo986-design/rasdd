@@ -42,16 +42,16 @@ describe("AuditTrailTimeline", () => {
     expect(standingOf(1, verify)).toBe("valid");
   });
 
-  it("يعرض رسالة فراغ ويترجم أحداث الخزنة", () => {
+  it("يعرض رسالة فراغ ويترجم أسماء الأحداث", () => {
     const { rerender } = render(<AuditTrailTimeline events={[]} verify={{ ok: true, count: 0 }} />);
     expect(screen.getByTestId("audit-empty")).toBeTruthy();
     rerender(
       <AuditTrailTimeline
-        events={[ev(1, { action: "ui.vault.escrow_use", role: "admin", actor: "ADMIN1" })]}
+        events={[ev(1, { action: "ui.sync.push", role: "admin", actor: "ADMIN1" })]}
         verify={{ ok: true, count: 1 }}
       />,
     );
-    expect(screen.getByText("استعمال مفتاح الطوارئ لفتح الخزنة")).toBeTruthy();
+    expect(screen.getByText("مزامنة البيانات")).toBeTruthy();
     expect(screen.getByText("مدير")).toBeTruthy();
   });
 });
