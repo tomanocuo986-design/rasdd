@@ -11,6 +11,7 @@
 import { calibrateSeverity, loadCalibration } from "./severity.js";
 import { STATUS_LABEL } from "./history.js";
 import { NO_BASIS_TEXT, ruleFor } from "./observations";
+import { analyzeRootCause } from "./root-cause";
 import { getManualObservations } from "./manual-observations";
 import { blendWithLexical, buildSemanticIndex } from "./semantic-match.js";
 
@@ -327,7 +328,7 @@ const SCORE = { high: 6, medium: 3, low: 1 };
 const LEVEL = { high: 3, medium: 2, low: 1 };
 
 /** يحوّل المسودة المعتمدة إلى ملاحظة رقابية بنفس بنية ملاحظات المحرك. */
-export function buildObservation({ title, text, sector = "", severity, cause, effect, recommendation, analysis, legalBasis, isNew }) {
+export function buildObservation({ title, text, sector = "", severity, cause, effect, recommendation, analysis, legalBasis, isNew, rootCause }) {
   const t = (title || deriveTitle(text)).trim();
   const rule = ruleFor(t || text);
   const best = analysis?.comparison?.matches?.[0];
@@ -351,6 +352,7 @@ export function buildObservation({ title, text, sector = "", severity, cause, ef
     },
     condition: String(text).trim(),
     cause: cause?.trim() || rule.cause,
+    rootCause: rootCause ?? analyzeRootCause({ test: t, condition: String(text), count: 1, repeated }),
     effect: effect?.trim() || rule.effect,
     // سند مقترح من مكتبة الأنظمة (أو كتبه المدقق) يتقدم على سند ملاحظة سابقة مشابهة
     legalBasis: legalBasis?.text?.trim()

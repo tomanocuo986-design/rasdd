@@ -1,5 +1,6 @@
 import { legalFrameworkOf } from "./legal-framework";
 import { isGarbled } from "./arabic-text.js";
+import { analyzeRootCause, type RootCause } from "./root-cause";
 export type Severity = "high" | "medium" | "low";
 
 export interface RegulationMatch {
@@ -47,6 +48,8 @@ export interface Observation {
   risk: RiskAssessment;
   condition: string;
   cause: string;
+  /** اقتراح السبب الجذري المستنتج محلياً (يراجعه المدقق؛ لا يغيّر حقل السبب إلا باختياره) */
+  rootCause?: RootCause | undefined;
   legalBasis: LegalBasis;
   effect: string;
   recommendation: string;
@@ -293,6 +296,8 @@ export function draftObservations(findings: AuditFinding[], opts: DraftOptions =
     if (!first) return;
     const rule = RULES.find((r) => r.match.test(first.test));
     const refs = [...new Set(group.map((f) => f.ref?.trim()).filter((r): r is string => !!r))].slice(0, 3);
+    const condition = conditionOf(group, first.test, label(first.dataset), refs);
+    const repeated = group.filter((f) => f.repeat !== undefined).length;
     out.push({
       id,
       dataset: first.dataset,
@@ -300,13 +305,14 @@ export function draftObservations(findings: AuditFinding[], opts: DraftOptions =
       test: first.test,
       count: group.length,
       refs,
-      repeated: group.filter((f) => f.repeat !== undefined).length,
+      repeated,
       risk: assessRisk(group, opts.totalRecords ?? 0),
-      condition: conditionOf(group, first.test, label(first.dataset), refs),
+      condition,
       cause: rule?.cause ?? contextualCause(first.test, label(first.dataset)),
       legalBasis: legalBasisOf(group),
       effect: rule?.effect ?? contextualEffect(first.test, group.length),
       recommendation: rule?.recommendation ?? DEFAULT_REC,
+      rootCause: analyzeRootCause({ test: first.test, condition, count: group.length, repeated }),
       status: opts.approved?.has(id) ? "approved" : "draft",
       isNew: group.every((f) => f.repeat === undefined),
     });

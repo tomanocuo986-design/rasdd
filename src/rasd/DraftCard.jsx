@@ -5,6 +5,7 @@ import { DELETE_GUIDANCE, SEVERITY_WORD } from "./auditor-draft.js";
 import { approveChatDraft, discardChatDraft, hasDefaultWording, makeChatDraft, memoFor } from "./chat-draft.js";
 import { NO_BASIS_TEXT, OBS_LABELS } from "./observations";
 import { STATUS_LABEL as BASIS_LABEL, basisStatus } from "./legal-status";
+import { RootCausePanel } from "./RootCausePanel";
 
 const sectorName = (k) => auditSectors.find((s) => s.key === k)?.label ?? "";
 
@@ -342,6 +343,12 @@ export function DraftCard({ source }) {
           {d.legalBasis.text}
         </Section>
         <Section label={OBS_LABELS.cause}>{d.cause}</Section>
+        <RootCausePanel
+          input={{ test: d.title, condition: d.condition, count: 1, repeated: d.analysis?.status === "new" ? 0 : 1 }}
+          rootCause={d.rootCause}
+          currentCause={d.cause}
+          onUse={(statement) => setD((x) => ({ ...x, cause: statement }))}
+        />
         <Section label={OBS_LABELS.effect}>{d.effect}</Section>
         <Section label={OBS_LABELS.recommendation}>{d.recommendation}</Section>
         {basisSource === "library" && (

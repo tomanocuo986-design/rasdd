@@ -35,6 +35,7 @@ import {
 import { loadOverrides, needsConfirmation, recordOverrides } from "./legal-status";
 import { DECISIONS, loadReviewLog, recordDecision, saveReviewLog } from "./review-log.js";
 import { trackEvent } from "./audit-trail.js";
+import { analyzeRootCause } from "./root-cause";
 
 const DIACRITICS = /[\u064B-\u0652\u0640]/g;
 const strip = (s) => String(s ?? "").replace(DIACRITICS, "");
@@ -174,6 +175,12 @@ export async function makeChatDraft(rawText, { force = false, corpus, docs } = {
     legalBasis: basis,
     candidates,
     hasLibrary,
+    rootCause: analyzeRootCause({
+      test: title,
+      condition: text,
+      count: 1,
+      repeated: prior.length > 0 ? 1 : 0,
+    }),
   };
 }
 
@@ -193,6 +200,7 @@ export function buildFromDraft(d, sector) {
     recommendation: d.recommendation,
     analysis: d.analysis,
     legalBasis: d.legalBasis,
+    rootCause: d.rootCause,
     // «جديدة» = لم يرد ما يشبهها في أي تقرير سابق
     isNew: d.analysis?.status === "new",
   });

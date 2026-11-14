@@ -3,6 +3,7 @@ import { OBS_LABELS, type ObsEdit, type Observation, type Severity } from "./obs
 import { ObservationEditForm } from "./ObservationEditForm";
 import { BasisConfirm, LegalBadge } from "./LegalBadge";
 import { loadOverrides, needsConfirmation, recordOverrides } from "./legal-status";
+import { RootCausePanel } from "./RootCausePanel";
 
 interface Props {
   observations: Observation[];
@@ -105,6 +106,31 @@ export function ObservationsPanel({ observations, sevLabel, sevClass, datasetLab
                   {o.risk.rationale}
                 </li>
               </ul>
+              <RootCausePanel
+                key={o.id}
+                input={{ test: o.test, condition: o.condition, count: o.count, repeated: o.repeated }}
+                rootCause={o.rootCause}
+                currentCause={o.cause}
+                onUse={
+                  onEdit
+                    ? (statement) =>
+                        // يُمرَّر الحقل كاملاً كي يبقى ما عدّله المدقق سابقاً؛ ويُخزَّن منه ما يخالف المسودة فقط
+                        onEdit(
+                          o,
+                          {
+                            test: o.test,
+                            condition: o.condition,
+                            legalBasis: o.legalBasis.text,
+                            cause: statement,
+                            effect: o.effect,
+                            recommendation: o.recommendation,
+                            rating: o.risk.rating,
+                          },
+                          false,
+                        )
+                    : undefined
+                }
+              />
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
