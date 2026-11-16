@@ -73,6 +73,8 @@ export interface AuditeeRecord {
   actionDate?: string | undefined;
   actionOwner?: string | undefined;
   decidedAt?: string | undefined;
+  /** رد تجريبي للتجربة فقط: لا يدخل التقرير أبداً */
+  demo?: boolean | undefined;
 }
 
 /** ما يصل إلى ملف التقرير (PDF وWord) */
@@ -107,16 +109,46 @@ const STOP = new Set(
   ),
 );
 
+/** جذع الكلمة: بلا «ال» التعريف ولا سوابق ولواحق قصيرة. */
+function stemOf(raw: string): string {
+  let w = normalizeText(raw)
+    .replace(/^(وال|بال|لل|فال|كال|ال)/, "")
+    .replace(/^[وبلفك](?=.{4,})/, "");
+  w = w.replace(/(ات|ون|ين|ان|ها|هم|ية|يه|ه)$/, (m) => (w.length - m.length >= 3 ? "" : m));
+  return w;
+}
+
+/** كلمات مفتاحية للمقارنة مع الكلمة كما وردت في النص (للعرض). */
+export function keywordPairs(s: string): Array<{ stem: string; word: string }> {
+  const out = new Map<string, string>();
+  for (const tok of String(s ?? "").split(/[^\u0621-\u064Aa-zA-Z0-9\u064B-\u065F]+/)) {
+    const word = tok.replace(/[\u064B-\u065F\u0640]/g, "");
+    const stem = stemOf(word);
+    if (stem.length >= 3 && !STOP.has(stem) && !out.has(stem))
+      out.set(stem, word.replace(/^و(?=.{4,})/, ""));
+  }
+  return [...out].map(([stem, word]) => ({ stem, word }));
+}
+
 /** كلمات مفتاحية للمقارنة: بلا أدوات ولا «ال» التعريف ولا لواحق قصيرة. */
 export function keywords(s: string): string[] {
-  const out = new Set<string>();
-  for (const raw of normalizeText(s).split(/[^\u0621-\u064Aa-zA-Z0-9]+/)) {
-    let w = raw.replace(/^(وال|بال|لل|فال|كال|ال)/, "").replace(/^[وبلفك](?=.{4,})/, "");
-    w = w.replace(/(ات|ون|ين|ان|ها|هم|ية|يه|ه)$/, (m) => (w.length - m.length >= 3 ? "" : m));
-    if (w.length >= 3 && !STOP.has(w)) out.add(w);
-  }
-  return [...out];
+  return keywordPairs(s).map((p) => p.stem);
 }
+
+/** هيكل الكلمة (بلا سابقة ميمية ولا حروف علة) لمطابقة «مودعة» مع «إيداع». */
+const skeleton = (w: string): string => w.replace(/^[متسا]/, "").replace(/[وايءؤئ]/g, "");
+
+/** تطابق جذعين: تساوٍ، أو بداية مشتركة، أو هيكل واحد. */
+export function sameStem(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (Math.min(a.length, b.length) >= 3 && (a.startsWith(b) || b.startsWith(a))) return true;
+  const sa = skeleton(a);
+  const sb = skeleton(b);
+  return sa.length >= 2 && sa === sb;
+}
+
+const countHits = (needles: string[], hay: string[]): number =>
+  needles.filter((k) => hay.some((h) => sameStem(k, h))).length;
 
 const hasAny = (norm: string, patterns: RegExp[]): boolean => patterns.some((p) => p.test(norm));
 const countAny = (norm: string, patterns: RegExp[]): number =>
@@ -305,14 +337,22 @@ export function analyzeResponse(
   const stance = classifyStance(n);
 
   // تغطية التوصية: نسبة كلماتها المفتاحية الواردة في الرد
-  const recKw = keywords(o.recommendation);
-  const respKw = new Set(keywords(text));
-  const hitRec = recKw.filter((k) => respKw.has(k));
-  const coverage = recKw.length ? hitRec.length / recKw.length : 0;
+  const recPairs = keywordPairs(o.recommendation);
+  const respKw = keywords(text);
+  const coverage = recPairs.length
+    ? countHits(
+        recPairs.map((p) => p.stem),
+        respKw,
+      ) / recPairs.length
+    : 0;
   // صلة الرد بموضوع الملاحظة (العنوان والحالة)
+  // الصلة تُقاس بالعنوان وحده (دقيق) وبالعنوان مع الحالة (أوسع)، ويؤخذ الأعلى: الحالة الطويلة لا تخفف صلة رد دقيق
+  const titleKw = keywords(o.test);
   const topicKw = keywords(`${o.test} ${o.condition}`);
-  const hitTopic = topicKw.filter((k) => respKw.has(k));
-  const topical = topicKw.length ? hitTopic.length / topicKw.length : 0;
+  const topical = Math.max(
+    titleKw.length ? countHits(titleKw, respKw) / titleKw.length : 0,
+    topicKw.length ? countHits(topicKw, respKw) / topicKw.length : 0,
+  );
 
   // مقارنة عدد الحالات
   const counts = extractCaseCounts(text);
@@ -328,9 +368,9 @@ export function analyzeResponse(
   }
 
   // ما لم يعالجه الرد من عناصر التوصية
-  const missing = recKw.filter((k) => !respKw.has(k)).slice(0, 6);
-  if (recKw.length && coverage < 0.5)
-    gaps.push(`لم يقابل الرد عناصر من التوصية، منها: ${missing.join("، ")}`);
+  const missing = recPairs.filter((p) => !respKw.some((h) => sameStem(p.stem, h))).slice(0, 6);
+  if (recPairs.length && coverage < 0.5)
+    gaps.push(`لم يقابل الرد عناصر من التوصية، منها: ${missing.map((p) => p.word).join("، ")}`);
 
   const justifyOnly =
     hasAny(n, JUSTIFY) && !commitments.done && !commitments.promised && stance !== "accepts";
@@ -619,7 +659,7 @@ export function decide(
 
 /** ما يُدرج في التقرير: نص رد الجهة متى سُجّل، والتعقيب وخطة العمل بعد اعتماد المدقق فقط. */
 export function reportBlock(r: AuditeeRecord | undefined): AuditeeReportBlock | undefined {
-  if (!r || !r.response.trim()) return undefined;
+  if (!r || r.demo || !r.response.trim()) return undefined;
   const approved = r.decision === "approved" || r.decision === "edited";
   return {
     response: r.response.trim(),
@@ -789,4 +829,46 @@ export async function requestAiAnalysis(
   const parsed = parseAiAnalysis(content, local);
   if (!parsed) throw new Error("رد النموذج غير مفهوم؛ بقي الرأي المحلي كما هو.");
   return parsed;
+}
+
+/* ------------------------------ ردود تجريبية ------------------------------ */
+
+/** رد تجريبي يتنوع بين القبول المسنَد والوعد والاعتراض والتبرير، لتجربة المحاكي. */
+export function sampleResponse(
+  o: Pick<Observation, "test" | "recommendation">,
+  index: number,
+): string {
+  switch (index % 4) {
+    case 0:
+      return `نوافق على الملاحظة بشأن «${o.test}». تم تنفيذ التوصية: ${o.recommendation} وذلك بموجب القرار رقم 15 المرفق.`;
+    case 1:
+      return `نوافق على الملاحظة بشأن «${o.test}» وسيتم تنفيذ التوصية قريباً.`;
+    case 2:
+      return `لا نوافق على الملاحظة، فلا يوجد مخالفة في «${o.test}» لدى الجهة.`;
+    default:
+      return `حدث ذلك بسبب نقص الكوادر وضغط العمل، ونعمل على المعالجة.`;
+  }
+}
+
+/** يضيف رداً تجريبياً لكل ملاحظة لا رد لها (ولا يمس ردوداً حقيقية). */
+export function addSampleResponses(
+  map: RecordMap,
+  list: ReadonlyArray<Pick<Observation, "id" | "test" | "recommendation">>,
+  now = new Date(),
+): RecordMap {
+  const next = { ...map };
+  list.forEach((o, i) => {
+    if (next[o.id]) return;
+    next[o.id] = {
+      response: sampleResponse(o, i),
+      receivedAt: now.toISOString(),
+      decision: "pending",
+      demo: true,
+    };
+  });
+  return next;
+}
+
+export function clearSampleResponses(map: RecordMap): RecordMap {
+  return Object.fromEntries(Object.entries(map).filter(([, r]) => !r.demo));
 }

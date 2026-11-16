@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { Observation } from "./observations";
 import {
+  addSampleResponses,
+  clearSampleResponses,
   analyzeResponse,
   setResponseText,
   splitBulkResponses,
@@ -138,6 +140,28 @@ export function AuditeeBulkPanel({ observations, map, onChange }: Props) {
             }}
           />
         </label>
+        <button
+          type="button"
+          className="rounded-md border px-2 py-1"
+          onClick={() => {
+            onChange(addSampleResponses(map, observations));
+            setMsg("أُدرجت ردود تجريبية (لا تدخل التقرير). اضغط «حلّل كل الردود» لتجربة المحاكي.");
+          }}
+        >
+          إدراج ردود تجريبية
+        </button>
+        {Object.values(map).some((r) => r.demo) && (
+          <button
+            type="button"
+            className="rounded-md border px-2 py-1 text-danger"
+            onClick={() => {
+              onChange(clearSampleResponses(map));
+              setMsg("حُذفت الردود التجريبية.");
+            }}
+          >
+            حذف الردود التجريبية
+          </button>
+        )}
         <button
           type="button"
           className="rounded-md border px-2 py-1 font-semibold"

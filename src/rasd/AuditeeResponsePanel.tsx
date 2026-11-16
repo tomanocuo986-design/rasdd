@@ -90,6 +90,14 @@ export function AuditeeResponsePanel({ observation: o, map, onChange }: Props) {
   return (
     <div className="mt-3 rounded-md border p-3 text-xs" data-testid="auditee-panel">
       <b>رد إدارة الجهة (محاكي الردود)</b>
+      {rec?.demo && (
+        <span
+          data-testid="auditee-demo"
+          className="mr-2 rounded-full border border-warning px-2 py-0.5 text-warning"
+        >
+          رد تجريبي · لا يدخل التقرير
+        </span>
+      )}
       <p className="mt-1 text-muted-foreground">
         الصق رد الجهة على هذه الملاحظة. يقارنه المحاكي بالحالة والتوصية ويقترح رأياً؛ لا يدخل «تعقيب
         الديوان» في التقرير إلا بعد اعتمادك له.

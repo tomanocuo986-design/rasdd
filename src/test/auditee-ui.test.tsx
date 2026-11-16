@@ -90,6 +90,20 @@ describe("محاكي ردود الجهة: الواجهة والتقرير", () =
     expect(Object.values(map).every((r) => r.analysis)).toBe(true);
   });
 
+  it("الردود التجريبية: تُحلَّل ولا تدخل التقرير أبداً ويمكن حذفها", () => {
+    const obs = list();
+    panel(obs);
+    const bulk = screen.getByTestId("auditee-bulk");
+    fireEvent.click(within(bulk).getByText("إدراج ردود تجريبية"));
+    expect(screen.getAllByTestId("auditee-demo")).toHaveLength(2);
+    fireEvent.click(within(bulk).getByText("حلّل كل الردود"));
+    fireEvent.click(within(bulk).getByText("اعتماد كل الآراء المعلّقة كما هي"));
+    expect(Object.values(loadResponses()).every((r) => r.demo && r.analysis)).toBe(true);
+    expect(attachResponses(obs).every((o) => !o.auditee)).toBe(true);
+    fireEvent.click(within(bulk).getByText("حذف الردود التجريبية"));
+    expect(Object.keys(loadResponses())).toHaveLength(0);
+  });
+
   it("المعاينة تعرض الرد والتعقيب المعتمدين فقط", () => {
     const o = {
       ...list()[0]!,

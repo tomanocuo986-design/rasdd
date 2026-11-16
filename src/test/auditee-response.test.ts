@@ -90,6 +90,30 @@ describe("analyzeResponse", () => {
   });
 });
 
+describe("مطابقة الصيغ المختلفة وقراءة الفجوات", () => {
+  const cash = {
+    ...obs,
+    test: "نقدية غير مودعة",
+    condition: "نقدية محصّلة لم تُودع في الحساب البنكي في المهلة المحددة",
+    recommendation: "إيداع النقدية يومياً وربط الإيداع بإشعار بنكي ومراجعة المهل",
+    count: 3,
+  };
+  it("«إيداع» في الرد تطابق «مودعة» في الملاحظة (ليس رداً بلا صلة)", () => {
+    const a = analyzeResponse(
+      cash,
+      "نوافق على الملاحظة وسيتم إيداع المبالغ خلال شهر من قبل مديرية الشؤون المالية.",
+    );
+    expect(a.verdict).toBe("partially_accepted");
+    expect(a.reasons.join(" ")).not.toContain("لا يتناول موضوع");
+  });
+  it("الفجوات بكلمات مقروءة لا بجذور مقطوعة", () => {
+    const a = analyzeResponse(cash, "حدث ذلك بسبب نقص الكوادر وضغط العمل في نهاية الشهر.");
+    const gap = a.gaps.join(" ");
+    expect(gap).toContain("إشعار");
+    expect(gap).not.toMatch(/(^|[\s،])(زام|مهل|اشعار)([\s،]|$)/);
+  });
+});
+
 describe("اعتماد المدقق وربط التقرير", () => {
   beforeEach(() => localStorage.clear());
   const base = (): RecordMap => {
