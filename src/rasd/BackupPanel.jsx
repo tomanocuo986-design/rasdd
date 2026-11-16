@@ -89,7 +89,7 @@ export default function BackupPanel({ onRestored }) {
     run(async () => {
       if (!cfg.id) update({ id: newWorkspaceId() });
       try {
-        const r = await pushWorkspace({ name: "مساحة عمل رصد", force });
+        const r = await pushWorkspace({ name: "مساحة عمل الرقيب", force });
         setConflict(false);
         setCfg(getSyncConfig());
         setMsg(`تم حفظ نسختك على الخادم (الإصدار ${r.version}).`);

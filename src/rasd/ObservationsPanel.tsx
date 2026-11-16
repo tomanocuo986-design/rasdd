@@ -4,6 +4,8 @@ import { ObservationEditForm } from "./ObservationEditForm";
 import { BasisConfirm, LegalBadge } from "./LegalBadge";
 import { loadOverrides, needsConfirmation, recordOverrides } from "./legal-status";
 import { RootCausePanel } from "./RootCausePanel";
+import { AuditeeResponsePanel, useAuditeeResponses } from "./AuditeeResponsePanel";
+import { AuditeeBulkPanel } from "./AuditeeBulkPanel";
 
 interface Props {
   observations: Observation[];
@@ -29,6 +31,7 @@ export function ObservationsPanel({ observations, sevLabel, sevClass, datasetLab
   const [fpFor, setFpFor] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [approveFor, setApproveFor] = useState<string | null>(null);
+  const [responses, setResponses] = useAuditeeResponses();
   const approved = observations.filter((o) => o.status === "approved").length;
   const pendingNew = observations.filter((o) => o.isNew && o.status !== "approved").length;
   const shown = onlyNew ? observations.filter((o) => o.isNew) : observations;
@@ -60,6 +63,7 @@ export function ObservationsPanel({ observations, sevLabel, sevClass, datasetLab
           </button>
         </div>
       )}
+      {observations.length > 0 && <AuditeeBulkPanel observations={observations} map={responses} onChange={setResponses} />}
       {deletedCount > 0 && (
         <button type="button" className="mt-2 rounded-md border px-2 py-1 text-xs" onClick={onRestore}>
           استرجاع الملاحظات المحذوفة ({deletedCount})
@@ -131,6 +135,7 @@ export function ObservationsPanel({ observations, sevLabel, sevClass, datasetLab
                     : undefined
                 }
               />
+              <AuditeeResponsePanel observation={o} map={responses} onChange={setResponses} />
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"

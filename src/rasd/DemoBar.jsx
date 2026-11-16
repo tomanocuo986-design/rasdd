@@ -42,7 +42,7 @@ export function DemoBar({ Button, active, hasData, hasSnapshot, summary, onLoad,
           <h2 className="text-base font-semibold">جرّب المنصة الآن دون إدخال أي بيانات</h2>
           <p className="mt-1 text-xs text-muted-foreground">
             بضغطة واحدة تُملأ المؤشرات ببيانات افتراضية لـ «{DEMO_MUNICIPALITY}» (سندات قبض وصرف، تسويات بنكية، رواتب، وقود،
-            مشتريات…) فترى كيف تكتشف رصد الانحرافات: صرف مزدوج، شيكات مكررة، حسابات بنكية مشتركة، تجزئة مشتريات وغيرها.
+            مشتريات…) فترى كيف تكتشف الرقيب الانحرافات: صرف مزدوج، شيكات مكررة، حسابات بنكية مشتركة، تجزئة مشتريات وغيرها.
           </p>
         </div>
         <Button variant="ink" onClick={onLoad}>

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 export const CHAT_PHASES = {
   chat: [
     { at: 0, label: "يقرأ سؤالك…" },
-    { at: 1.5, label: "يطّلع على ملخص بياناتك في رصد…" },
+    { at: 1.5, label: "يطّلع على ملخص بياناتك في الرقيب…" },
     { at: 4, label: "يفكّر في الإجابة…" },
     { at: 12, label: "ما زال يعمل على الرد…" },
     { at: 22, label: "الخدمة مشغولة، يعيد المحاولة…" },

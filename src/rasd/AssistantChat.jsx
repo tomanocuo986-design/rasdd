@@ -230,9 +230,9 @@ export function AssistantChat() {
   return (
     <div className="rasd-ai" dir="rtl">
       {
-        <section className="rasd-ai-panel" role="dialog" aria-label="مساعد رصد" hidden={!open}>
+        <section className="rasd-ai-panel" role="dialog" aria-label="مساعد الرقيب" hidden={!open}>
           <header className="rasd-ai-head">
-            <strong>مساعد رصد</strong>
+            <strong>مساعد الرقيب</strong>
             <span className="rasd-ai-sub">
               {ctx ? "يرى ملخص بياناتك الحالية" : "لا توجد بيانات مفتوحة بعد"}
             </span>
@@ -284,7 +284,7 @@ export function AssistantChat() {
             )}
             {messages.length === 0 && (
               <div className="rasd-ai-empty">
-                <p>اسألني عن بياناتك، الملاحظات، أو طريقة استخدام رصد.</p>
+                <p>اسألني عن بياناتك، الملاحظات، أو طريقة استخدام الرقيب.</p>
                 <div className="rasd-ai-chips">
                   {SUGGESTIONS.map((s) => (
                     <button key={s} type="button" onClick={() => send(s)}>
@@ -392,7 +392,7 @@ export function AssistantChat() {
         type="button"
         className="rasd-ai-fab"
         aria-expanded={open}
-        aria-label={open ? "إغلاق المساعد" : "فتح مساعد رصد"}
+        aria-label={open ? "إغلاق المساعد" : "فتح مساعد الرقيب"}
         onClick={() => setOpen((v) => !v)}
       >
         {open ? "×" : busy ? <ThinkingIndicator compact label="المساعد يعمل…" /> : "✦ اسأل المساعد"}

@@ -737,7 +737,7 @@ export function SectorAudit({ auditTab }) {
       setMsg(`تم استيراد تقرير سابق يحتوي ${fs.length} ملاحظة`);
     } catch {
       setMsg(
-        "تعذر قراءة التقرير. استخدم ملف PDF مصدّر من رصد أو يحتوي ملاحظات بمستويات مخاطر.",
+        "تعذر قراءة التقرير. استخدم ملف PDF مصدّر من الرقيب أو يحتوي ملاحظات بمستويات مخاطر.",
       );
     } finally {
       if (reportRef.current) reportRef.current.value = "";

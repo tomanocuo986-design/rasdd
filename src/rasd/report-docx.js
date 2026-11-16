@@ -220,6 +220,40 @@ export async function buildReportDocx(template, report, meta = {}) {
     const recIdx = trs.findIndex((r) => norm(textOf(r)) === "التوصيات");
     if (recIdx >= 0 && trs[recIdx + 1]) setCellParas(cells(trs[recIdx + 1])[0], [para(doc, [run(doc, String(o.recommendation ?? ""))])]);
 
+    // رد إدارة الجهة · خطة العمل · تعقيب الديوان (من محاكي ردود الجهة: التعقيب لا يصل إلا بعد اعتماد المدقق)
+    const au = o.auditee;
+    if (au?.response) {
+      const respIdx = trs.findIndex((r) => norm(textOf(r)) === "رد إدارة الجهة");
+      if (respIdx >= 0 && trs[respIdx + 1]) setCellParas(cells(trs[respIdx + 1])[0], [para(doc, [run(doc, au.response)])]);
+    }
+    if (au?.actionDate || au?.actionOwner) {
+      const planRow = trs.find((r) => cells(r).length >= 2 && norm(textOf(r)).includes("تاريخ التنفيذ"));
+      if (planRow) {
+        for (const c of cells(planRow)) {
+          const label = norm(textOf(c));
+          const value = label.includes("تاريخ التنفيذ") ? au.actionDate : label.includes("الطرف المسؤول") ? au.actionOwner : "";
+          const p0 = kids(c, "p")[0];
+          if (value && p0) p0.appendChild(run(doc, ` ${value}`));
+        }
+      }
+    }
+    if (au?.opinion) {
+      const opIdx = trs.findIndex((r) => norm(textOf(r)) === "تعقيب الديوان");
+      if (opIdx >= 0) {
+        let target = trs[opIdx + 1];
+        if (!target) {
+          // القالب ينتهي برأس «تعقيب الديوان» بلا صف محتوى: نستنسخ صف محتوى «رد إدارة الجهة»
+          const respIdx = trs.findIndex((r) => norm(textOf(r)) === "رد إدارة الجهة");
+          const proto = trs[respIdx + 1];
+          if (proto) {
+            target = proto.cloneNode(true);
+            trs[opIdx].parentNode.appendChild(target);
+          }
+        }
+        if (target) setCellParas(cells(target)[0], [para(doc, [run(doc, au.opinion)])]);
+      }
+    }
+
     body.insertBefore(t, insertBefore);
     const gap = el(doc, "p");
     body.insertBefore(gap, insertBefore);

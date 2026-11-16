@@ -198,7 +198,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       <div className="auth-orb auth-orb-1" />
       <div className="auth-orb auth-orb-2" />
       <div className="auth-card" key={step}>
-        <div className="auth-logo">رصد</div>
+        <div className="auth-logo">الرقيب</div>
 
         {step === "form" && (
           <form onSubmit={submit} className="auth-form" key={shake} data-shake={shake > 0}>

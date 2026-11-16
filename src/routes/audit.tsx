@@ -4,7 +4,7 @@ import { AuditTrailPanel } from "@/rasd/AuditTrailPanel";
 
 export const Route = createFileRoute("/audit")({
   head: () => ({
-    meta: [{ title: "رصد | سجل التدقيق" }],
+    meta: [{ title: "الرقيب | سجل التدقيق" }],
   }),
   component: AuditPage,
 });

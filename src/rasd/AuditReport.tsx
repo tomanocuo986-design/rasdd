@@ -20,6 +20,8 @@ import {
 } from "./observations";
 import { ObservationEditForm } from "./ObservationEditForm";
 import { ReportModelPreview } from "./ReportModelPreview";
+import { attachResponses } from "./auditee-response";
+import { useAuditeeResponses } from "./AuditeeResponsePanel";
 import { loadReportMeta, saveReportMeta, type ReportMeta } from "./report-docx";
 import { clearManualObservations, useManualObservations } from "./manual-observations";
 import { BasisConfirm, LegalBadge } from "./LegalBadge";
@@ -79,6 +81,7 @@ export function AuditReport({ Button, sevLabel, sevClass, datasetLabel, loadSave
   const [msg, setMsg] = useState("");
   const [pending, setPending] = useState<{ kind: "approve"; id: string } | { kind: "export" } | { kind: "export-docx" } | null>(null);
   const manual = useManualObservations();
+  const [responses] = useAuditeeResponses();
 
   useEffect(() => {
     setApproved(loadIds("approved"));
@@ -105,7 +108,8 @@ export function AuditReport({ Button, sevLabel, sevClass, datasetLabel, loadSave
   const date = (isCurrent ? draftDate : picked?.date) ?? new Date().toISOString().slice(0, 10);
   const compliance = isCurrent ? compl : picked?.compliance;
   // ما يدخل ملف التقرير: الملاحظة الجديدة (لم ترد في تقارير سابقة) لا تُدرج قبل اعتماد المدقق لها
-  const exportable = isCurrent ? reportable(observations) : observations;
+  // ردود الجهة تُلحق بالملاحظات الحالية؛ التعقيب فيها لا يوجد إلا بعد اعتماد المدقق (انظر reportBlock)
+  const exportable = isCurrent ? attachResponses(reportable(observations), responses) : observations;
   const sum = summarize(observations);
   const pendingNew = isCurrent ? observations.filter((o) => o.isNew && o.status !== "approved").length : 0;
   const hasDraft = auditObs.length > 0 || manual.length > 0;

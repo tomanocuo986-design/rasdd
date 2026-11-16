@@ -118,7 +118,7 @@ export function decryptStream(password) {
           header = Buffer.from(buf.subarray(0, HEADER_LEN));
           buf = buf.subarray(HEADER_LEN);
           if (!header.subarray(0, 8).equals(MAGIC)) {
-            throw new PackError("PACK_BAD_MAGIC", "الملف ليس حزمة رصد صالحة.");
+            throw new PackError("PACK_BAD_MAGIC", "الملف ليس حزمة الرقيب صالحة.");
           }
           const logN = header[8];
           if (logN < MIN_LOG_N || logN > MAX_LOG_N) throw new PackError("PACK_BAD_PARAMS");

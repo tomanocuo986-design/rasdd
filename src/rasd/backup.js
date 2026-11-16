@@ -114,9 +114,9 @@ export async function exportBackup({ passphrase } = {}, storage = globalThis.loc
 /** Validates a parsed backup object. Throws an Arabic message when it is not a RASD backup. */
 export function validateBackup(b) {
   if (!b || typeof b !== "object" || b.app !== "rasd" || typeof b.data !== "object" || !b.data)
-    throw Error("الملف ليس نسخة احتياطية صالحة من رصد");
+    throw Error("الملف ليس نسخة احتياطية صالحة من الرقيب");
   if (typeof b.version === "number" && b.version > BACKUP_VERSION)
-    throw Error("النسخة الاحتياطية أحدث من هذا الإصدار من رصد");
+    throw Error("النسخة الاحتياطية أحدث من هذا الإصدار من الرقيب");
   return b;
 }
 

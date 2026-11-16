@@ -143,7 +143,7 @@ def run_audit(store: dict[str, pd.DataFrame], params: dict | None = None, today:
     def add(ds, i, sev, test, detail, amount=0.0):
         out.append(Finding(ds, i, sev, test, detail, abs(amount or 0.0), LEGAL.get(DATASETS[ds]["sector"], "")))
 
-    # 1) الحقول الجوهرية الناقصة (تُرفض/تُرصد فوراً)
+    # 1) الحقول الجوهرية الناقصة (تُرفض/تُالرقيب فوراً)
     for key, d in DATASETS.items():
         labels = {f["key"]: f["label"] for f in d["fields"]}
         for i, r in enumerate(_rows(store, key)):

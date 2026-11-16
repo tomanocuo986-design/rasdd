@@ -391,7 +391,7 @@ var keys = [
 ];
 var texts = {
   ar: [
-    "رصد",
+    "الرقيب",
     "ذكاء البيانات، وضوح القرار.",
     "مساحة العمل",
     "نظرة عامة",
@@ -476,7 +476,7 @@ var texts = {
     "حدد معامل الحساسية لتفعيل الكشف",
   ],
   en: [
-    "Rasd",
+    "Al-Raqeeb",
     "Data intelligence. Clear decisions.",
     "Workspace",
     "Overview",
@@ -561,7 +561,7 @@ var texts = {
     "Set a sensitivity factor to enable detection",
   ],
   fr: [
-    "Rasd",
+    "Al-Raqeeb",
     "Intelligence des données. Décisions claires.",
     "Espace de travail",
     "Vue générale",
@@ -646,7 +646,7 @@ var texts = {
     "Définissez le facteur de sensibilité",
   ],
   es: [
-    "Rasd",
+    "Al-Raqeeb",
     "Datos inteligentes. Decisiones claras.",
     "Espacio de trabajo",
     "Resumen",
@@ -731,7 +731,7 @@ var texts = {
     "Define el factor de sensibilidad",
   ],
   de: [
-    "Rasd",
+    "Al-Raqeeb",
     "Daten verstehen. Klar entscheiden.",
     "Arbeitsbereich",
     "Übersicht",
@@ -816,7 +816,7 @@ var texts = {
     "Empfindlichkeitsfaktor festlegen",
   ],
   tr: [
-    "Rasd",
+    "Al-Raqeeb",
     "Akıllı veriler. Net kararlar.",
     "Çalışma alanı",
     "Genel bakış",
@@ -901,7 +901,7 @@ var texts = {
     "Hassasiyet katsayısı belirleyin",
   ],
   pt: [
-    "Rasd",
+    "Al-Raqeeb",
     "Dados inteligentes. Decisões claras.",
     "Área de trabalho",
     "Visão geral",
@@ -986,7 +986,7 @@ var texts = {
     "Defina o fator de sensibilidade",
   ],
   ru: [
-    "Rasd",
+    "Al-Raqeeb",
     "Умные данные. Ясные решения.",
     "Рабочая область",
     "Обзор",
@@ -1071,7 +1071,7 @@ var texts = {
     "Укажите коэффициент чувствительности",
   ],
   zh: [
-    "Rasd",
+    "Al-Raqeeb",
     "智能数据，清晰决策。",
     "工作区",
     "概览",
@@ -1156,7 +1156,7 @@ var texts = {
     "请设置灵敏度系数",
   ],
   ja: [
-    "Rasd",
+    "Al-Raqeeb",
     "データの知性。明確な判断。",
     "ワークスペース",
     "概要",
@@ -1241,7 +1241,7 @@ var texts = {
     "感度係数を設定してください",
   ],
   hi: [
-    "Rasd",
+    "Al-Raqeeb",
     "बुद्धिमान डेटा। स्पष्ट निर्णय।",
     "कार्यस्थल",
     "अवलोकन",
@@ -1326,7 +1326,7 @@ var texts = {
     "संवेदनशीलता मान दें",
   ],
   fa: [
-    "رصد",
+    "الرقیب",
     "داده‌های هوشمند، تصمیم‌های روشن.",
     "فضای کار",
     "نمای کلی",
@@ -2542,7 +2542,7 @@ function SectorAudit({ auditTab }) {
       setMsg(`تم استيراد تقرير سابق يحتوي ${fs.length} ملاحظة`);
     } catch {
       setMsg(
-        "تعذر قراءة التقرير. استخدم ملف PDF مصدّر من رصد أو يحتوي ملاحظات بمستويات مخاطر.",
+        "تعذر قراءة التقرير. استخدم ملف PDF مصدّر من الرقيب أو يحتوي ملاحظات بمستويات مخاطر.",
       );
     } finally {
       if (reportRef.current) reportRef.current.value = "";

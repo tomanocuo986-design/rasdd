@@ -30,7 +30,7 @@ export function providerFromEnv(env: Record<string, string | undefined> = proces
   return { kind: "gemini", apiKey: key, models: [main, ...fallbacks.filter((m) => m !== main)] };
 }
 
-export const SYSTEM = `أنت «مساعد رصد»، مساعد ذكاء اصطناعي داخل تطبيق «رصد» لتحليل بيانات الأنشطة وتدقيقها (حدود، تكرارات، قيم شاذة، تقارير، ملاحظات).
+export const SYSTEM = `أنت «مساعد الرقيب»، مساعد ذكاء اصطناعي داخل تطبيق «الرقيب» لتحليل بيانات الأنشطة وتدقيقها (حدود، تكرارات، قيم شاذة، تقارير، ملاحظات).
 
 القواعد:
 - أجب بلغة المستخدم (العربية افتراضيًا) بإيجاز ووضوح، وبخطوات عملية عند الحاجة.

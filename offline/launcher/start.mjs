@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// مشغّل رصد (النسخة بدون إنترنت): يفك تشفير التطبيق بكلمة المرور إلى مجلد مؤقت خاص، ويشغّله على
+// مشغّل الرقيب (النسخة بدون إنترنت): يفك تشفير التطبيق بكلمة المرور إلى مجلد مؤقت خاص، ويشغّله على
 // 127.0.0.1 فقط، ويفتح المتصفح، وعند الإغلاق يحذف النسخة المفكوكة. البيانات تُحفظ في مجلد المستخدم.
 // خيارات: --no-open (لا تفتح المتصفح). متغيرات: RASD_PORT، RASD_DATA_DIR، RASD_PACK_PASSWORD (للأتمتة).
 import { spawn } from "node:child_process";
@@ -161,7 +161,7 @@ function openBrowser(url) {
 }
 
 async function main() {
-  console.log("\n  Rasd - Offline Copy\n");
+  console.log("\n  Al-Raqeeb - Offline Copy\n");
   cleanStale();
 
   let sandbox = "";

@@ -88,11 +88,11 @@ export function ReportModelPreview({ observations, sevLabel, onDownloadWord }: P
               <div style={bar}>التوصيات</div>
               <p className="p-2">{o.recommendation}</p>
               <div style={bar}>رد إدارة الجهة</div>
-              <p className="p-2 text-muted-foreground">—</p>
+              <p className={o.auditee?.response ? "p-2" : "p-2 text-muted-foreground"}>{o.auditee?.response ?? "—"}</p>
               <div style={bar}>خطة (خطط) العمل</div>
-              <p className="p-2 text-muted-foreground">تاريخ التنفيذ: — · الطرف المسؤول: —</p>
+              <p className="p-2 text-muted-foreground">تاريخ التنفيذ: {o.auditee?.actionDate ?? "—"} · الطرف المسؤول: {o.auditee?.actionOwner ?? "—"}</p>
               <div style={bar}>تعقيب الديوان</div>
-              <p className="p-2 text-muted-foreground">—</p>
+              <p className={o.auditee?.opinion ? "p-2" : "p-2 text-muted-foreground"}>{o.auditee?.opinion ?? "—"}</p>
             </article>
           ))}
         </div>

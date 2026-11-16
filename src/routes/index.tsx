@@ -9,9 +9,9 @@ import { AuthGate } from "@/components/AuthGate";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "رصد | مساحة تحليل بياناتك" },
+      { title: "الرقيب | مساحة تحليل بياناتك" },
       { name: "description", content: "حلّل مدخلات الأنشطة السبعة وصدّر تقاريرك." },
-      { property: "og:title", content: "رصد | مساحة تحليل بياناتك" },
+      { property: "og:title", content: "الرقيب | مساحة تحليل بياناتك" },
       { property: "og:description", content: "حلّل مدخلاتك وصدّر تقاريرك." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

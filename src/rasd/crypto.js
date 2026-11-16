@@ -63,7 +63,7 @@ export async function encryptJson(value, passphrase, iter = ITER) {
 }
 
 export async function decryptJson(envelope, passphrase) {
-  if (!isEncryptedEnvelope(envelope)) throw Error("الملف ليس نسخة مشفّرة من رصد");
+  if (!isEncryptedEnvelope(envelope)) throw Error("الملف ليس نسخة مشفّرة من الرقيب");
   if (!passphrase) throw Error("هذه النسخة مشفّرة: أدخل كلمة المرور");
   try {
     const key = await deriveKey(passphrase, b64ToBytes(envelope.salt), envelope.iter || ITER);

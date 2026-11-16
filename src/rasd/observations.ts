@@ -1,6 +1,7 @@
 import { legalFrameworkOf } from "./legal-framework";
 import { isGarbled } from "./arabic-text.js";
 import { analyzeRootCause, type RootCause } from "./root-cause";
+import type { AuditeeReportBlock } from "./auditee-response";
 export type Severity = "high" | "medium" | "low";
 
 export interface RegulationMatch {
@@ -60,6 +61,8 @@ export interface Observation {
   isNew?: boolean;
   /** true when the auditor edited the drafted wording (see ObsEdit) */
   edited?: boolean;
+  /** رد إدارة الجهة وتعقيب الديوان المعتمد (محاكي ردود الجهة)؛ التعقيب لا يوجد إلا بعد اعتماد المدقق */
+  auditee?: AuditeeReportBlock | undefined;
 }
 
 interface Rule {
@@ -338,6 +341,9 @@ export function observationLines(o: Observation, riskWord: Record<Severity, stri
     `${OBS_LABELS.cause}: ${o.cause}`,
     `${OBS_LABELS.effect}: ${o.effect}`,
     `${OBS_LABELS.recommendation}: ${o.recommendation}`,
+    ...(o.auditee?.response ? [`رد إدارة الجهة: ${o.auditee.response}`] : []),
+    ...(o.auditee?.actionDate || o.auditee?.actionOwner ? [`خطة العمل: تاريخ التنفيذ ${o.auditee.actionDate ?? "—"} · الطرف المسؤول ${o.auditee.actionOwner ?? "—"}`] : []),
+    ...(o.auditee?.opinion ? [`تعقيب الديوان: ${o.auditee.opinion}`] : []),
   ];
 }
 
@@ -470,7 +476,7 @@ export const reportable = (list: Observation[]): Observation[] => list.filter((o
 
 export function clearDrafts(): void {
   try {
-    [DRAFT_KEY, IDS_KEY.deleted, IDS_KEY.approved, EDITS_KEY].forEach((k) => localStorage.removeItem(k));
+    [DRAFT_KEY, IDS_KEY.deleted, IDS_KEY.approved, EDITS_KEY, "rasd-auditee-responses"].forEach((k) => localStorage.removeItem(k));
   } catch {
     /* storage unavailable */
   }
