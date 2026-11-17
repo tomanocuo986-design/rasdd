@@ -669,12 +669,13 @@ export function reportBlock(r: AuditeeRecord | undefined): AuditeeReportBlock | 
   };
 }
 
-/** يُلحق ردود الجهة بالملاحظات (لا يغيّر شيئاً لملاحظة لا رد لها). */
+/** يُلحق ردود الجهة بالملاحظات المعتمدة فقط (لا يغيّر شيئاً لملاحظة لا رد لها أو غير معتمدة). */
 export function attachResponses<T extends Observation>(
   list: T[],
   map: RecordMap = loadResponses(),
 ): T[] {
   return list.map((o) => {
+    if (o.status !== "approved") return o;
     const block = reportBlock(map[o.id]);
     return block ? { ...o, auditee: block } : o;
   });

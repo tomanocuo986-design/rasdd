@@ -51,6 +51,48 @@ describe("محاكي ردود الجهة: الواجهة والتقرير", () =
     expect(screen.getByTestId("auditee-bulk")).toBeInTheDocument();
   });
 
+  it("المحاكي لا يظهر إلا للملاحظة المعتمدة؛ وعند عدم الاعتماد يختفي", () => {
+    const [a, b] = list();
+    panel([a!, { ...b!, status: "draft" }]);
+    expect(screen.getAllByTestId("auditee-panel")).toHaveLength(1);
+    expect(screen.getByTestId("auditee-bulk")).toBeInTheDocument();
+  });
+
+  it("لا لوحة دفعة ولا محاكي إذا لم تُعتمد أي ملاحظة", () => {
+    panel(list().map((o) => ({ ...o, status: "draft" as const })));
+    expect(screen.queryByTestId("auditee-panel")).toBeNull();
+    expect(screen.queryByTestId("auditee-bulk")).toBeNull();
+  });
+
+  it("أثناء تعديل الصياغة يختفي المحاكي ويعود بعد الإغلاق", () => {
+    render(
+      <ObservationsPanel
+        observations={list()}
+        sevLabel={sev}
+        sevClass={cls}
+        datasetLabel={(k) => k}
+        onToggleApprove={() => {}}
+        onDelete={() => {}}
+        deletedCount={0}
+        onRestore={() => {}}
+        onEdit={() => {}}
+      />,
+    );
+    expect(screen.getAllByTestId("auditee-panel")).toHaveLength(2);
+    fireEvent.click(screen.getAllByText("تعديل الصياغة")[0]!);
+    expect(screen.getAllByTestId("auditee-panel")).toHaveLength(1);
+    fireEvent.click(screen.getByText("إغلاق التعديل"));
+    expect(screen.getAllByTestId("auditee-panel")).toHaveLength(2);
+  });
+
+  it("رد محفوظ لملاحظة غير معتمدة لا يدخل التقرير", () => {
+    const [a] = list();
+    const draft = { ...a!, status: "draft" as const };
+    const map = { [a!.id]: { response: "رد", decision: "pending" } } as never;
+    expect(attachResponses([draft], map)[0]!.auditee).toBeUndefined();
+    expect(attachResponses([a!], map)[0]!.auditee?.response).toBe("رد");
+  });
+
   it("تحليل ثم اعتماد: يُحفظ ويصل التقرير؛ وقبل الاعتماد لا تعقيب", () => {
     const obs = list();
     panel(obs);

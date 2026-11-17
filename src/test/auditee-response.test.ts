@@ -152,11 +152,14 @@ describe("اعتماد المدقق وربط التقرير", () => {
     saveResponses(m);
     expect(loadResponses()["o1"]?.decision).toBe("approved");
     const list = attachResponses([
-      { ...(obs as unknown as Observation) },
-      { ...(obs as unknown as Observation), id: "o2" },
+      { ...(obs as unknown as Observation), status: "approved" },
+      { ...(obs as unknown as Observation), id: "o2", status: "approved" },
     ]);
     expect(list[0]?.auditee?.opinion).toBeTruthy();
     expect(list[1]?.auditee).toBeUndefined();
+    // الملاحظة غير المعتمدة لا يُلحق بها الرد مطلقاً
+    const draft = attachResponses([{ ...(obs as unknown as Observation), status: "draft" }]);
+    expect(draft[0]?.auditee).toBeUndefined();
     expect(summarizeResponses([{ id: "o1" }, { id: "o2" }], m)).toMatchObject({
       total: 2,
       withResponse: 1,

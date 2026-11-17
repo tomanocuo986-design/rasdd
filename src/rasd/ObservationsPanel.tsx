@@ -35,6 +35,9 @@ export function ObservationsPanel({ observations, sevLabel, sevClass, datasetLab
   const approved = observations.filter((o) => o.status === "approved").length;
   const pendingNew = observations.filter((o) => o.isNew && o.status !== "approved").length;
   const shown = onlyNew ? observations.filter((o) => o.isNew) : observations;
+  // محاكي ردود الجهة: يظهر فقط للملاحظة المعتمدة من المدقق؛ ويختفي عند عدم الاعتماد أو أثناء تعديل الصياغة
+  const canRespond = (o: Observation) => o.status === "approved" && editFor !== o.id;
+  const respondable = observations.filter(canRespond);
   const approveClick = (o: Observation) => {
     if (o.status !== "approved" && needsConfirmation(o, loadOverrides())) setApproveFor(o.id);
     else onToggleApprove(o.id);
@@ -63,7 +66,7 @@ export function ObservationsPanel({ observations, sevLabel, sevClass, datasetLab
           </button>
         </div>
       )}
-      {observations.length > 0 && <AuditeeBulkPanel observations={observations} map={responses} onChange={setResponses} />}
+      {respondable.length > 0 && <AuditeeBulkPanel observations={respondable} map={responses} onChange={setResponses} />}
       {deletedCount > 0 && (
         <button type="button" className="mt-2 rounded-md border px-2 py-1 text-xs" onClick={onRestore}>
           استرجاع الملاحظات المحذوفة ({deletedCount})
@@ -135,7 +138,7 @@ export function ObservationsPanel({ observations, sevLabel, sevClass, datasetLab
                     : undefined
                 }
               />
-              <AuditeeResponsePanel observation={o} map={responses} onChange={setResponses} />
+              {canRespond(o) && <AuditeeResponsePanel observation={o} map={responses} onChange={setResponses} />}
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
